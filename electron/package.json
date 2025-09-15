@@ -9,10 +9,11 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "dependencies": {
+    "electron": "^38.1.0"
+  },
   "devDependencies": {
-    "@types/electron": "^1.4.38",
     "@types/node": "^24.4.0",
-    "electron": "^38.1.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.2"
   }

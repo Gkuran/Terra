@@ -4,6 +4,6 @@
   "scripts": {
     "dev:frontend": "cd frontend && npm run dev",
     "dev:backend": "cd backend && npx ts-node src/server.ts",
-    "dev:electron": "cd electron && npx ts-node src/main.ts"
+    "dev:electron": "cd electron && npx tsc && npx electron dist/main.js"
   }
 }

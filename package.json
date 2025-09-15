@@ -1,9 +1,52 @@
 {
   "name": "terra",
+  "version": "1.0.0",
+  "description": "Terra application",
+  "author": "Terra Team",
   "private": true,
+  "main": "electron/dist/main.js",
   "scripts": {
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\" \"npm run dev:electron\"",
     "dev:frontend": "cd frontend && npm run dev",
     "dev:backend": "cd backend && npx ts-node src/server.ts",
-    "dev:electron": "cd electron && npx tsc && npx electron dist/main.js"
+    "dev:electron": "cd electron && npx electron src/main.js",
+    "start:electron": "cd electron && npx electron dist/main.js",
+    "build": "npm run build:frontend && npm run build:backend && npm run build:electron && electron-builder",
+    "build:frontend": "cd frontend && npm run build",
+    "build:backend": "cd backend && tsc",
+    "build:electron": "cd electron && if not exist dist mkdir dist && copy src\\*.js dist\\"
+  },
+  "devDependencies": {
+    "@types/node": "^24.4.0",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.0.0",
+    "electron": "^38.1.0",
+    "electron-builder": "^26.0.12",
+    "wait-on": "^8.0.5"
+  },
+  "build": {
+    "appId": "com.terra.app",
+    "productName": "Terra",
+    "files": [
+      "electron/dist/**/*",
+      "frontend/dist/**/*",
+      "backend/dist/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "buildResources": "assets"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icon.icns"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/icon.png"
+    }
   }
 }

@@ -1,20 +1,39 @@
-const { app, BrowserWindow } = require("electron");
-const path = require("path");
+import { app, BrowserWindow } from "electron";
+import * as path from "path";
+
+let mainWindow: BrowserWindow | null = null;
 
 function createWindow() {
-  const win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
     webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
+      preload: path.join(__dirname, "preload.js"), // opcional
     },
   });
 
-  // durante dev → carrega React no Vite
-  win.loadURL("http://localhost:5173");
+  if (process.env.NODE_ENV === "development") {
+    mainWindow.loadURL("http://localhost:5173"); // porta do Vite/React
+    mainWindow.webContents.openDevTools();
+  } else {
+    mainWindow.loadFile(path.join(__dirname, "../frontend/index.html"));
+  }
 
-  // em produção, você vai apontar para build do frontend
-  // win.loadFile(path.join(__dirname, "../frontend/index.html"));
+  mainWindow.on("closed", () => {
+    mainWindow = null;
+  });
 }
 
-app.whenReady().then(createWindow);
+app.on("ready", createWindow);
+
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") {
+    app.quit();
+  }
+});
+
+app.on("activate", () => {
+  if (mainWindow === null) {
+    createWindow();
+  }
+});

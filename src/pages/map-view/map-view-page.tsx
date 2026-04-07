@@ -74,7 +74,7 @@ export function MapViewPage({
   const [lastUploadResult, setLastUploadResult] = useState<UploadResult | null>(null)
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
   const [isConnectorsModalOpen, setIsConnectorsModalOpen] = useState(false)
-  const [activePanel, setActivePanel] = useState<'session' | 'layers' | null>('layers')
+  const [activePanel, setActivePanel] = useState<'session' | 'layers' | null>(null)
   const selectedFeature = useMemo(
     () => {
       const combinedFeatures = [

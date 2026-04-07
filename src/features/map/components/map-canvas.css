@@ -1,0 +1,35 @@
+.map-canvas {
+  position: relative;
+  min-height: 100vh;
+}
+
+.map-canvas .maplibregl-map {
+  min-height: 100vh;
+}
+
+.map-canvas__popup {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 10rem;
+}
+
+.map-canvas__popup span {
+  color: #425461;
+  font-size: 0.82rem;
+}
+
+@media (max-width: 1100px) {
+  .map-canvas,
+  .map-canvas .maplibregl-map {
+    min-height: 68vh;
+  }
+}
+
+@media (max-width: 760px) {
+  .map-canvas,
+  .map-canvas .maplibregl-map {
+    min-height: 52vh;
+    border-radius: 1rem;
+    overflow: hidden;
+  }
+}

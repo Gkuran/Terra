@@ -1,12 +1,34 @@
 :root {
   color-scheme: light;
-  font-family: "Segoe UI", sans-serif;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
   line-height: 1.5;
   font-synthesis: none;
   font-weight: 400;
   text-rendering: optimizeLegibility;
   -moz-osx-font-smoothing: grayscale;
   -webkit-font-smoothing: antialiased;
+  --boulder-font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  --boulder-color-primary: #365a47;
+  --boulder-color-primary-hover: #294838;
+  --boulder-color-primary-soft: #d6e4d2;
+  --boulder-color-surface: #f5edd7;
+  --boulder-color-background: #fbf8ef;
+  --boulder-color-background-subtle: #efe5c8;
+  --boulder-color-surface-glass: rgba(251, 248, 239, 0.88);
+  --boulder-color-background-glass: rgba(255, 252, 245, 0.94);
+  --boulder-color-background-glass-subtle: rgba(247, 241, 222, 0.92);
+  --boulder-color-border: #d9cfb6;
+  --boulder-color-border-glass: rgba(217, 207, 182, 0.92);
+  --boulder-color-text: #1d251f;
+  --boulder-color-text-secondary: #4c5a50;
+  --boulder-shadow-glass: 0 18px 38px rgba(61, 78, 66, 0.16);
+  --color-bg-canvas: #dfe8d9;
+  --color-surface-0: #fbf8ef;
+  --color-accent: #365a47;
+  --color-accent-strong: #294838;
+  --color-focus-ring: #90b48d;
+  --color-text-primary: var(--boulder-color-text);
+  --color-text-secondary: var(--boulder-color-text-secondary);
 }
 
 *,
@@ -20,10 +42,13 @@ body,
 #root {
   height: 100%;
   margin: 0;
+  overflow: hidden;
 }
 
 body {
   min-width: 320px;
+  color: var(--boulder-color-text);
+  background: linear-gradient(180deg, #e8efe4 0%, #dfe8d9 100%);
 }
 
 button,
@@ -31,4 +56,8 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+a {
+  color: inherit;
 }

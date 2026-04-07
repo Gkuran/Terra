@@ -1,0 +1,47 @@
+.terra-header {
+  z-index: 50;
+}
+
+.terra-header__brandcopy span,
+.terra-header__context span,
+.terra-header__metric span {
+  color: var(--boulder-color-text-secondary);
+  font-size: 0.8rem;
+}
+
+.terra-header__nav {
+  justify-content: center;
+  padding: 0.7rem;
+}
+
+.terra-header__context {
+  display: grid;
+  text-align: center;
+}
+
+.terra-header__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.terra-header__actions button svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.terra-header__metric {
+  display: grid;
+  justify-items: end;
+}
+
+@media (max-width: 920px) {
+  .terra-header {
+    left: 0.5rem;
+    right: 0.5rem;
+  }
+
+  .terra-header__nav {
+    display: none;
+  }
+}

@@ -1,0 +1,57 @@
+.app-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+  padding: 0.625rem 0.9rem;
+  border-radius: 0.85rem;
+  border: 1px solid transparent;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.app-button:hover {
+  transform: translateY(-1px);
+}
+
+.app-button:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.app-button--primary {
+  background: var(--color-accent);
+  color: var(--color-surface-0);
+}
+
+.app-button--primary:hover {
+  background: var(--color-accent-strong);
+}
+
+.app-button--secondary {
+  background: rgba(8, 15, 22, 0.74);
+  border-color: rgba(150, 173, 164, 0.3);
+  color: var(--color-text-primary);
+}
+
+.app-button--secondary:hover {
+  background: rgba(15, 24, 34, 0.88);
+}
+
+.app-button--ghost {
+  background: transparent;
+  border-color: rgba(150, 173, 164, 0.24);
+  color: var(--color-text-secondary);
+}
+
+.app-button--ghost:hover {
+  color: var(--color-text-primary);
+  border-color: rgba(150, 173, 164, 0.38);
+}

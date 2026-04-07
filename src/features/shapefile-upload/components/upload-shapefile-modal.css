@@ -1,0 +1,64 @@
+.upload-shapefile-modal {
+  display: grid;
+  gap: 1rem;
+}
+
+.upload-shapefile-modal__intro,
+.upload-shapefile-modal__feedback p,
+.upload-shapefile-modal__empty,
+.upload-shapefile-modal__history-item p {
+  margin: 0;
+  color: var(--boulder-color-text-secondary);
+}
+
+.upload-shapefile-modal__dropzone {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem;
+  border: 1px dashed var(--boulder-color-border);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+}
+
+.upload-shapefile-modal__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.upload-shapefile-modal__feedback {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.upload-shapefile-modal__history {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.upload-shapefile-modal__history-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.upload-shapefile-modal__history-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.upload-shapefile-modal__history-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem;
+  border: 1px solid var(--boulder-color-border);
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.42);
+}

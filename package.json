@@ -12,9 +12,11 @@
   "dependencies": {
     "@tanstack/react-query": "^5.90.2",
     "@tanstack/react-router": "^1.132.31",
+    "boulder-ui": "^0.1.10",
     "maplibre-gl": "^5.9.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-icons": "^5.6.0",
     "react-map-gl": "^8.1.0",
     "shpjs": "^6.2.0",
     "zod": "^4.1.12",

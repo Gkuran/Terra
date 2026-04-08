@@ -1,5 +1,6 @@
 import type { FeatureProperties } from '@/entities/geographic-feature/model/geographic-feature'
 import type {
+  ConnectorContext,
   ConnectorDataset,
   ConnectorSourceType,
 } from '@/features/connectors/types/connector-dataset'
@@ -15,6 +16,7 @@ const connectorDatasetPalette = [
 
 interface CreateConnectorDatasetInput {
   collection: ConnectorDataset['collection']
+  context: ConnectorContext
   label: string
   order: number
   sourceType: ConnectorSourceType
@@ -55,6 +57,7 @@ function prefixCollectionFeatures(
 
 export function createConnectorDataset({
   collection,
+  context,
   label,
   order,
   sourceType,
@@ -66,7 +69,9 @@ export function createConnectorDataset({
   return {
     id: datasetId,
     color: paletteEntry.color,
+    context,
     importedAt: new Date(timestamp).toISOString(),
+    isVisible: true,
     label,
     sourceType,
     tone: paletteEntry.tone,

@@ -9,6 +9,7 @@
 .map-view-page__dock,
 .map-view-page__legend,
 .map-view-page__panel,
+.map-view-page__results,
 .map-view-page__inspector {
   position: absolute;
   z-index: 30;
@@ -30,6 +31,13 @@
   left: 0.75rem;
   bottom: 4.4rem;
   width: 20rem;
+  top: auto;
+}
+
+.map-view-page__results {
+  right: 0.75rem;
+  bottom: 4.4rem;
+  width: 23rem;
   top: auto;
 }
 
@@ -89,6 +97,7 @@
   .map-view-page__dock,
   .map-view-page__legend,
   .map-view-page__panel,
+  .map-view-page__results,
   .map-view-page__inspector {
     position: static;
     width: auto;

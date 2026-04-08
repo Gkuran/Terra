@@ -16,6 +16,7 @@ import type { FeatureCollection, Geometry, Polygon } from 'geojson'
 import type { DatasetMetadata } from '@/entities/dataset/model/dataset'
 import type { FeatureProperties } from '@/entities/geographic-feature/model/geographic-feature'
 import { ConnectorLegendPanel } from '@/features/connectors/components/connector-legend-panel'
+import { ConnectorResultsPanel } from '@/features/connectors/components/connector-results-panel'
 import { ConnectorsModal } from '@/features/connectors/components/connectors-modal'
 import { searchOccurrencesByBbox } from '@/features/connectors/bbox/lib/search-occurrences-by-bbox'
 import { useConnectorDatasetsStore } from '@/features/connectors/stores/use-connector-datasets-store'
@@ -75,8 +76,13 @@ export function MapViewPage({
   const connectorDatasets = useConnectorDatasetsStore((state) => state.datasets)
   const addConnectorDataset = useConnectorDatasetsStore((state) => state.addDataset)
   const clearConnectorDatasets = useConnectorDatasetsStore((state) => state.clearDatasets)
+  const removeConnectorDataset = useConnectorDatasetsStore((state) => state.removeDataset)
+  const setDatasetVisibility = useConnectorDatasetsStore(
+    (state) => state.setDatasetVisibility,
+  )
   const [lastUploadResult, setLastUploadResult] = useState<UploadResult | null>(null)
   const [bboxSearchError, setBboxSearchError] = useState<string | null>(null)
+  const [focusDatasetId, setFocusDatasetId] = useState<string | null>(null)
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
   const [isConnectorsModalOpen, setIsConnectorsModalOpen] = useState(false)
   const [activePanel, setActivePanel] = useState<'session' | 'layers' | null>(null)
@@ -88,6 +94,7 @@ export function MapViewPage({
     onSuccess: ({ featureCollection, queryLabel, resultCount }) => {
       addConnectorDataset({
         collection: featureCollection,
+        context: 'bbox',
         label: queryLabel,
         sourceType: 'gbif',
       })
@@ -108,7 +115,9 @@ export function MapViewPage({
     () => {
       const combinedFeatures = [
         ...features.features,
-        ...connectorDatasets.flatMap((entry) => entry.collection.features),
+        ...connectorDatasets.flatMap((entry) =>
+          entry.isVisible ? entry.collection.features : [],
+        ),
       ]
 
       return (
@@ -127,7 +136,9 @@ export function MapViewPage({
 
       const combinedFeatures = [
         ...features.features,
-        ...connectorDatasets.flatMap((entry) => entry.collection.features),
+        ...connectorDatasets.flatMap((entry) =>
+          entry.isVisible ? entry.collection.features : [],
+        ),
       ]
 
       return (
@@ -146,9 +157,11 @@ export function MapViewPage({
   const visibleFeatureCount =
     features.features.length +
     connectorDatasets.reduce(
-      (total, entry) => total + entry.collection.features.length,
+      (total, entry) =>
+        total + (entry.isVisible ? entry.collection.features.length : 0),
       0,
     )
+  const bboxDatasets = connectorDatasets.filter((dataset) => dataset.context === 'bbox')
 
   function handleUploadComplete(
     collection: FeatureCollection<Geometry, FeatureProperties>,
@@ -156,6 +169,7 @@ export function MapViewPage({
   ) {
     addConnectorDataset({
       collection,
+      context: 'manual',
       label: result.sourceName,
       sourceType: 'shapefile',
     })
@@ -164,6 +178,7 @@ export function MapViewPage({
 
   function handleClearAllConnectorDatasets() {
     clearConnectorDatasets()
+    setFocusDatasetId(null)
     setHoveredFeatureId(null)
     setSelection(null)
   }
@@ -186,8 +201,10 @@ export function MapViewPage({
 
       <MapCanvas
         connectorDatasets={connectorDatasets}
+        focusDatasetId={focusDatasetId}
         features={features}
         layers={layers}
+        onFocusHandled={() => setFocusDatasetId(null)}
         onBoundingBoxComplete={handleBoundingBoxComplete}
       />
 
@@ -212,7 +229,24 @@ export function MapViewPage({
           <ConnectorLegendPanel
             datasets={connectorDatasets}
             onClearAll={handleClearAllConnectorDatasets}
+            onRemoveDataset={(datasetId) => {
+              removeConnectorDataset(datasetId)
+              if (hoveredFeatureId?.startsWith(datasetId)) {
+                setHoveredFeatureId(null)
+              }
+              if (selection?.featureId?.startsWith(datasetId)) {
+                setSelection(null)
+              }
+            }}
+            onSetDatasetVisibility={setDatasetVisibility}
+            onZoomToDataset={(datasetId) => setFocusDatasetId(datasetId)}
           />
+        </aside>
+      ) : null}
+
+      {bboxDatasets.length > 0 ? (
+        <aside className="map-view-page__results">
+          <ConnectorResultsPanel datasets={bboxDatasets} />
         </aside>
       ) : null}
 
@@ -329,6 +363,7 @@ export function MapViewPage({
         onConnectGbif={({ collection, sourceName }) => {
           addConnectorDataset({
             collection,
+            context: 'manual',
             label: sourceName,
             sourceType: 'gbif',
           })
@@ -345,6 +380,7 @@ export function MapViewPage({
         onImportCsv={({ collection, sourceName }) => {
           addConnectorDataset({
             collection,
+            context: 'manual',
             label: sourceName,
             sourceType: 'csv',
           })

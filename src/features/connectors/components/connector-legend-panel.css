@@ -25,10 +25,16 @@
 }
 
 .connector-legend-panel__item {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.connector-legend-panel__item-main,
+.connector-legend-panel__actions {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.8rem;
-  min-width: 0;
 }
 
 .connector-legend-panel__swatch {
@@ -78,4 +84,19 @@
 .connector-legend-panel__copy span {
   color: var(--boulder-color-text-secondary);
   font-size: 0.8rem;
+}
+
+.connector-legend-panel__actions {
+  justify-content: flex-end;
+}
+
+.connector-legend-panel__icon-button {
+  min-width: 2.4rem;
+  min-height: 2.4rem;
+  padding: 0;
+}
+
+.connector-legend-panel__icon-button svg {
+  width: 1rem;
+  height: 1rem;
 }

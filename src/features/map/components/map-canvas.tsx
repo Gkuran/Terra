@@ -56,6 +56,8 @@ interface MapCanvasProps {
   features: FeatureCollection<Geometry, GeoJsonProperties>
   layers: LayerMetadata[]
   connectorDatasets: ConnectorDataset[]
+  focusDatasetId: string | null
+  onFocusHandled: () => void
   onBoundingBoxComplete: (bbox: MapBoundingBox) => void
 }
 
@@ -143,6 +145,8 @@ export function MapCanvas({
   features,
   layers,
   connectorDatasets,
+  focusDatasetId,
+  onFocusHandled,
   onBoundingBoxComplete,
 }: MapCanvasProps) {
   const mapRef = useRef<MapRef | null>(null)
@@ -159,7 +163,9 @@ export function MapCanvas({
     () =>
       [
         ...features.features,
-        ...connectorDatasets.flatMap((dataset) => dataset.collection.features),
+        ...connectorDatasets.flatMap((dataset) =>
+          dataset.isVisible ? dataset.collection.features : [],
+        ),
       ].find(
         (feature) =>
           'id' in (feature.properties ?? {}) &&
@@ -171,11 +177,11 @@ export function MapCanvas({
   const interactiveLayerIds = useMemo(
     () => [
       ...buildInteractiveLayerIds(layers),
-      ...connectorDatasets.flatMap((dataset) => [
-        `${dataset.id}-fill`,
-        `${dataset.id}-line`,
-        `${dataset.id}-circle`,
-      ]),
+      ...connectorDatasets.flatMap((dataset) =>
+        dataset.isVisible
+          ? [`${dataset.id}-fill`, `${dataset.id}-line`, `${dataset.id}-circle`]
+          : [],
+      ),
     ],
     [connectorDatasets, layers],
   )
@@ -248,6 +254,37 @@ export function MapCanvas({
       duration: 1200,
     })
   }, [connectorDatasets])
+
+  useEffect(() => {
+    if (!focusDatasetId || !mapRef.current) {
+      return
+    }
+
+    const targetDataset = connectorDatasets.find(
+      (dataset) => dataset.id === focusDatasetId,
+    )
+
+    if (!targetDataset) {
+      onFocusHandled()
+      return
+    }
+
+    const bounds = getFeatureCollectionBounds(targetDataset.collection)
+
+    if (bounds) {
+      mapRef.current.fitBounds(bounds, {
+        padding: {
+          top: 72,
+          right: 96,
+          bottom: 120,
+          left: 96,
+        },
+        duration: 900,
+      })
+    }
+
+    onFocusHandled()
+  }, [connectorDatasets, focusDatasetId, onFocusHandled])
 
   function handleMapClick(event: MapMouseEvent) {
     if (activeTool !== 'inspect') {
@@ -395,6 +432,10 @@ export function MapCanvas({
   }
 
   function renderConnectorDataset(dataset: ConnectorDataset) {
+    if (!dataset.isVisible) {
+      return null
+    }
+
     return (
       <Source
         data={dataset.collection}

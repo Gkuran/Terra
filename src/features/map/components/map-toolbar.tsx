@@ -5,6 +5,7 @@ import {
   LuHand,
   LuInfo,
   LuPlugZap,
+  LuSquare,
   LuSlidersHorizontal,
 } from "react-icons/lu";
 
@@ -59,6 +60,16 @@ export function MapToolbar({
           variant="secondary"
         >
           <LuPlugZap aria-hidden="true" />
+        </AppButton>
+        <AppButton
+          aria-label="Enable area selection tool"
+          aria-pressed={activeTool === "bbox"}
+          className="map-toolbar__button"
+          onClick={() => setActiveTool("bbox")}
+          title="Area selection"
+          variant={activeTool === "bbox" ? "primary" : "secondary"}
+        >
+          <LuSquare aria-hidden="true" />
         </AppButton>
         <AppButton
           aria-label="Enable inspect tool"

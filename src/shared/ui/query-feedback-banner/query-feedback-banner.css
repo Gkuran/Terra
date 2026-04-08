@@ -1,0 +1,24 @@
+.query-feedback-banner {
+  position: absolute;
+  top: 5.1rem;
+  left: 50%;
+  z-index: 35;
+  width: min(26rem, calc(100vw - 8rem));
+  transform: translateX(-50%);
+}
+
+.query-feedback-banner__card {
+  width: 100%;
+}
+
+.query-feedback-banner__content {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+}
+
+@media (max-width: 760px) {
+  .query-feedback-banner {
+    width: calc(100vw - 1.5rem);
+  }
+}

@@ -1,5 +1,6 @@
 import type { ChangeEvent } from 'react'
 import { useId, useMemo, useState } from 'react'
+import { useMutation } from '@tanstack/react-query'
 import {
   Alert,
   Card,
@@ -16,6 +17,7 @@ import type { DatasetMetadata } from '@/entities/dataset/model/dataset'
 import type { FeatureProperties } from '@/entities/geographic-feature/model/geographic-feature'
 import { ConnectorLegendPanel } from '@/features/connectors/components/connector-legend-panel'
 import { ConnectorsModal } from '@/features/connectors/components/connectors-modal'
+import { searchOccurrencesByBbox } from '@/features/connectors/bbox/lib/search-occurrences-by-bbox'
 import { useConnectorDatasetsStore } from '@/features/connectors/stores/use-connector-datasets-store'
 import type { LayerMetadata } from '@/entities/layer/model/layer-metadata'
 import { FeatureInspectorPanel } from '@/features/feature-inspector/components/feature-inspector-panel'
@@ -24,8 +26,10 @@ import type { MapViewScenario } from '@/features/map/api/get-map-view-data'
 import { MapCanvas } from '@/features/map/components/map-canvas'
 import { MapToolbar } from '@/features/map/components/map-toolbar'
 import { useMapUiStore } from '@/features/map/stores/use-map-ui-store'
+import type { MapBoundingBox } from '@/features/map/types/map-bounding-box'
 import { UploadShapefileModal } from '@/features/shapefile-upload/components/upload-shapefile-modal'
 import type { UploadResult } from '@/features/shapefile-upload/types/upload-result'
+import { QueryFeedbackBanner } from '@/shared/ui/query-feedback-banner/query-feedback-banner'
 import { StatusBadge } from '@/shared/ui/status-badge/status-badge'
 import { TerraFooter } from '@/shared/ui/terra-footer/terra-footer'
 import { TerraHeader } from '@/shared/ui/terra-header/terra-header'
@@ -72,9 +76,34 @@ export function MapViewPage({
   const addConnectorDataset = useConnectorDatasetsStore((state) => state.addDataset)
   const clearConnectorDatasets = useConnectorDatasetsStore((state) => state.clearDatasets)
   const [lastUploadResult, setLastUploadResult] = useState<UploadResult | null>(null)
+  const [bboxSearchError, setBboxSearchError] = useState<string | null>(null)
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
   const [isConnectorsModalOpen, setIsConnectorsModalOpen] = useState(false)
   const [activePanel, setActivePanel] = useState<'session' | 'layers' | null>(null)
+  const bboxSearchMutation = useMutation({
+    mutationFn: searchOccurrencesByBbox,
+    onMutate: () => {
+      setBboxSearchError(null)
+    },
+    onSuccess: ({ featureCollection, queryLabel, resultCount }) => {
+      addConnectorDataset({
+        collection: featureCollection,
+        label: queryLabel,
+        sourceType: 'gbif',
+      })
+      setLastUploadResult({
+        id: `bbox-${Date.now()}`,
+        sourceName: queryLabel,
+        featureCount: resultCount,
+        importedAt: new Date().toISOString(),
+        status: 'success',
+        message: 'Occurrences were fetched from the backend bbox search.',
+      })
+    },
+    onError: (error) => {
+      setBboxSearchError(error.message)
+    },
+  })
   const selectedFeature = useMemo(
     () => {
       const combinedFeatures = [
@@ -147,6 +176,10 @@ export function MapViewPage({
     onScenarioChange(event.target.value as MapViewScenario)
   }
 
+  function handleBoundingBoxComplete(bbox: MapBoundingBox) {
+    bboxSearchMutation.mutate(bbox)
+  }
+
   return (
     <main className="map-view-page">
       <TerraHeader activeDataset={dataset} />
@@ -155,6 +188,7 @@ export function MapViewPage({
         connectorDatasets={connectorDatasets}
         features={features}
         layers={layers}
+        onBoundingBoxComplete={handleBoundingBoxComplete}
       />
 
       <div className="map-view-page__dock">
@@ -166,6 +200,12 @@ export function MapViewPage({
           }
         />
       </div>
+
+      <QueryFeedbackBanner
+        errorMessage={bboxSearchError}
+        isLoading={bboxSearchMutation.isPending}
+        loadingLabel="Querying fauna and flora occurrences for the selected area."
+      />
 
       {connectorDatasets.length > 0 ? (
         <aside className="map-view-page__legend">
@@ -236,6 +276,7 @@ export function MapViewPage({
                     {stateMessage}
                   </Alert>
                 ) : null}
+
               </CardContent>
             </Card>
           ) : (

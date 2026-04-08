@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type {
+  Feature,
   FeatureCollection,
   GeoJsonProperties,
   Geometry,
@@ -21,6 +22,7 @@ import type { LayerMetadata } from '@/entities/layer/model/layer-metadata'
 import type { ConnectorDataset } from '@/features/connectors/types/connector-dataset'
 import { useLayerPresentationStore } from '@/features/layers/stores/use-layer-presentation-store'
 import { useMapUiStore } from '@/features/map/stores/use-map-ui-store'
+import type { MapBoundingBox } from '@/features/map/types/map-bounding-box'
 import { env } from '@/shared/config/env'
 import './map-canvas.css'
 
@@ -54,6 +56,12 @@ interface MapCanvasProps {
   features: FeatureCollection<Geometry, GeoJsonProperties>
   layers: LayerMetadata[]
   connectorDatasets: ConnectorDataset[]
+  onBoundingBoxComplete: (bbox: MapBoundingBox) => void
+}
+
+interface BoundingBoxDraft {
+  current: [number, number]
+  start: [number, number]
 }
 
 function visitCoordinates(
@@ -135,6 +143,7 @@ export function MapCanvas({
   features,
   layers,
   connectorDatasets,
+  onBoundingBoxComplete,
 }: MapCanvasProps) {
   const mapRef = useRef<MapRef | null>(null)
   const visibilityById = useLayerPresentationStore((state) => state.visibilityById)
@@ -144,6 +153,7 @@ export function MapCanvas({
   const setSelection = useMapUiStore((state) => state.setSelection)
   const hoveredFeatureId = useMapUiStore((state) => state.hoveredFeatureId)
   const setHoveredFeatureId = useMapUiStore((state) => state.setHoveredFeatureId)
+  const [bboxDraft, setBboxDraft] = useState<BoundingBoxDraft | null>(null)
 
   const selectedFeature = useMemo(
     () =>
@@ -168,6 +178,45 @@ export function MapCanvas({
       ]),
     ],
     [connectorDatasets, layers],
+  )
+  const bboxPreview = useMemo<FeatureCollection<Geometry, GeoJsonProperties> | null>(
+    () => {
+      if (!bboxDraft) {
+        return null
+      }
+
+      const [startLng, startLat] = bboxDraft.start
+      const [currentLng, currentLat] = bboxDraft.current
+      const minLng = Math.min(startLng, currentLng)
+      const minLat = Math.min(startLat, currentLat)
+      const maxLng = Math.max(startLng, currentLng)
+      const maxLat = Math.max(startLat, currentLat)
+
+      return {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            geometry: {
+              type: 'Polygon',
+              coordinates: [
+                [
+                  [minLng, minLat],
+                  [maxLng, minLat],
+                  [maxLng, maxLat],
+                  [minLng, maxLat],
+                  [minLng, minLat],
+                ],
+              ],
+            },
+            properties: {
+              id: 'bbox-preview',
+            },
+          } satisfies Feature<Geometry, GeoJsonProperties>,
+        ],
+      }
+    },
+    [bboxDraft],
   )
 
   useEffect(() => {
@@ -230,7 +279,20 @@ export function MapCanvas({
     })
   }
 
-  function handleMapHover(event: MapLayerMouseEvent) {
+  function handleMapMouseMove(event: MapLayerMouseEvent) {
+    if (activeTool === 'bbox' && bboxDraft) {
+      setBboxDraft((currentDraft) =>
+        currentDraft
+          ? {
+              ...currentDraft,
+              current: [event.lngLat.lng, event.lngLat.lat],
+            }
+          : null,
+      )
+      setHoveredFeatureId(null)
+      return
+    }
+
     const [topFeature] = event.features ?? []
 
     if (!topFeature || !topFeature.properties) {
@@ -242,6 +304,42 @@ export function MapCanvas({
       typeof topFeature.properties.id === 'string' ? topFeature.properties.id : null
 
     setHoveredFeatureId(hoveredId)
+  }
+
+  function handleMapMouseDown(event: MapMouseEvent) {
+    if (activeTool !== 'bbox') {
+      return
+    }
+
+    setSelection(null)
+    setHoveredFeatureId(null)
+    setBboxDraft({
+      start: [event.lngLat.lng, event.lngLat.lat],
+      current: [event.lngLat.lng, event.lngLat.lat],
+    })
+  }
+
+  function handleMapMouseUp() {
+    if (!bboxDraft || activeTool !== 'bbox') {
+      return
+    }
+
+    const [startLng, startLat] = bboxDraft.start
+    const [endLng, endLat] = bboxDraft.current
+    const bbox: MapBoundingBox = {
+      minLng: Math.min(startLng, endLng),
+      minLat: Math.min(startLat, endLat),
+      maxLng: Math.max(startLng, endLng),
+      maxLat: Math.max(startLat, endLat),
+    }
+
+    setBboxDraft(null)
+
+    if (bbox.minLng === bbox.maxLng || bbox.minLat === bbox.maxLat) {
+      return
+    }
+
+    onBoundingBoxComplete(bbox)
   }
 
   function renderLayer(layer: LayerMetadata) {
@@ -379,13 +477,16 @@ export function MapCanvas({
   return (
     <section className="map-canvas" aria-label="Terra map canvas">
       <Map
-        cursor={activeTool === 'inspect' ? 'crosshair' : 'grab'}
+        cursor={activeTool === 'bbox' ? 'crosshair' : activeTool === 'inspect' ? 'crosshair' : 'grab'}
+        dragPan={activeTool !== 'bbox'}
         initialViewState={initialViewState}
         interactiveLayerIds={interactiveLayerIds}
         mapStyle={env.VITE_MAP_STYLE_URL ?? baseMapStyle}
         onClick={handleMapClick}
         onMouseLeave={() => setHoveredFeatureId(null)}
-        onMouseMove={handleMapHover}
+        onMouseMove={handleMapMouseMove}
+        onMouseDown={handleMapMouseDown}
+        onMouseUp={handleMapMouseUp}
         ref={mapRef}
         reuseMaps
       >
@@ -415,6 +516,28 @@ export function MapCanvas({
         </Source>
 
         {connectorDatasets.map(renderConnectorDataset)}
+
+        {bboxPreview ? (
+          <Source data={bboxPreview} id="bbox-preview" type="geojson">
+            <Layer
+              id="bbox-preview-fill"
+              paint={{
+                'fill-color': '#215f53',
+                'fill-opacity': 0.14,
+              }}
+              type="fill"
+            />
+            <Layer
+              id="bbox-preview-line"
+              paint={{
+                'line-color': '#215f53',
+                'line-dasharray': [2, 2],
+                'line-width': 2,
+              }}
+              type="line"
+            />
+          </Source>
+        ) : null}
 
         {selection && selectedFeature ? (
           <Popup

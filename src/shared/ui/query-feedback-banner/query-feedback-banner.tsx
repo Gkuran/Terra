@@ -1,4 +1,5 @@
 import { Alert, Card, CardContent, ProgressBar } from 'boulder-ui'
+import { IoClose } from 'react-icons/io5'
 
 import './query-feedback-banner.css'
 
@@ -6,12 +7,14 @@ interface QueryFeedbackBannerProps {
   errorMessage: string | null
   isLoading: boolean
   loadingLabel: string
+  onDismissError: () => void
 }
 
 export function QueryFeedbackBanner({
   errorMessage,
   isLoading,
   loadingLabel,
+  onDismissError,
 }: QueryFeedbackBannerProps) {
   if (!isLoading && !errorMessage) {
     return null
@@ -32,9 +35,19 @@ export function QueryFeedbackBanner({
           ) : null}
 
           {errorMessage ? (
-            <Alert heading="Bounding box search" variant="danger">
-              {errorMessage}
-            </Alert>
+            <div className="query-feedback-banner__error">
+              <Alert heading="Bounding box search" variant="danger">
+                {errorMessage}
+              </Alert>
+              <button
+                aria-label="Dismiss bounding box search error"
+                className="query-feedback-banner__dismiss"
+                onClick={onDismissError}
+                type="button"
+              >
+                <IoClose aria-hidden="true" />
+              </button>
+            </div>
           ) : null}
         </CardContent>
       </Card>

@@ -192,6 +192,7 @@ export function MapViewPage({
   }
 
   function handleBoundingBoxComplete(bbox: MapBoundingBox) {
+    setBboxSearchError(null)
     bboxSearchMutation.mutate(bbox)
   }
 
@@ -222,6 +223,7 @@ export function MapViewPage({
         errorMessage={bboxSearchError}
         isLoading={bboxSearchMutation.isPending}
         loadingLabel="Querying fauna and flora occurrences for the selected area."
+        onDismissError={() => setBboxSearchError(null)}
       />
 
       {connectorDatasets.length > 0 ? (
@@ -361,6 +363,7 @@ export function MapViewPage({
         isOpen={isConnectorsModalOpen}
         onClose={() => setIsConnectorsModalOpen(false)}
         onConnectGbif={({ collection, sourceName }) => {
+          setBboxSearchError(null)
           addConnectorDataset({
             collection,
             context: 'manual',
@@ -378,6 +381,7 @@ export function MapViewPage({
           setIsConnectorsModalOpen(false)
         }}
         onImportCsv={({ collection, sourceName }) => {
+          setBboxSearchError(null)
           addConnectorDataset({
             collection,
             context: 'manual',

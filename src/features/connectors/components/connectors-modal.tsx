@@ -62,6 +62,19 @@ export function ConnectorsModal({
     },
   })
 
+  function handleClose() {
+    setCsvFeedback(null)
+    gbifMutation.reset()
+    onClose()
+  }
+
+  function handleGbifFieldChange(setter: (value: string) => void, value: string) {
+    if (gbifMutation.error) {
+      gbifMutation.reset()
+    }
+    setter(value)
+  }
+
   async function handleCsvFileChange(event: ChangeEvent<HTMLInputElement>) {
     const [file] = Array.from(event.target.files ?? [])
 
@@ -89,13 +102,20 @@ export function ConnectorsModal({
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="lg" variant="glass">
+    <Modal isOpen={isOpen} onClose={handleClose} size="lg" variant="glass">
       <ModalHeader>
         <ModalTitle>Connect data source</ModalTitle>
       </ModalHeader>
 
       <ModalContent>
-        <Tabs.Root onValueChange={(value) => setActiveTab(value as ConnectorMode)} value={activeTab}>
+        <Tabs.Root
+          onValueChange={(value) => {
+            setActiveTab(value as ConnectorMode)
+            setCsvFeedback(null)
+            gbifMutation.reset()
+          }}
+          value={activeTab}
+        >
           <Tabs.List>
             <Tabs.Trigger value="csv">Import CSV</Tabs.Trigger>
             <Tabs.Trigger value="gbif">Connect GBIF</Tabs.Trigger>
@@ -129,7 +149,9 @@ export function ConnectorsModal({
               <div className="connectors-modal__form">
                 <FormField label="Scientific name">
                   <Input
-                    onChange={(event) => setScientificName(event.target.value)}
+                    onChange={(event) =>
+                      handleGbifFieldChange(setScientificName, event.target.value)
+                    }
                     placeholder="Araucaria angustifolia"
                     value={scientificName}
                   />
@@ -137,14 +159,18 @@ export function ConnectorsModal({
                 <FormField label="Country code">
                   <Input
                     maxLength={2}
-                    onChange={(event) => setCountry(event.target.value.toUpperCase())}
+                    onChange={(event) =>
+                      handleGbifFieldChange(setCountry, event.target.value.toUpperCase())
+                    }
                     placeholder="BR"
                     value={country}
                   />
                 </FormField>
                 <FormField label="State or province">
                   <Input
-                    onChange={(event) => setStateProvince(event.target.value)}
+                    onChange={(event) =>
+                      handleGbifFieldChange(setStateProvince, event.target.value)
+                    }
                     placeholder="Rio Grande do Sul"
                     value={stateProvince}
                   />
@@ -188,7 +214,7 @@ export function ConnectorsModal({
             Connect GBIF
           </AppButton>
         ) : null}
-        <AppButton onClick={onClose} variant="secondary">
+        <AppButton onClick={handleClose} variant="secondary">
           Close
         </AppButton>
       </ModalFooter>

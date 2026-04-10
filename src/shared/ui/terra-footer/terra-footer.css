@@ -16,8 +16,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  min-height: 3.25rem;
-  padding: 0.8rem 1rem;
+  min-height: 2.95rem;
+  padding: 0.62rem 1rem;
 }
 
 .terra-footer__section {
@@ -32,10 +32,42 @@
   text-align: right;
 }
 
+.terra-footer__links {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
 .terra-footer__label,
 .terra-footer__credit {
   color: var(--boulder-color-text-secondary);
   font-size: 0.82rem;
+}
+
+.terra-footer__link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  border: 1px solid rgba(24, 49, 42, 0.12);
+  border-radius: 999px;
+  color: var(--boulder-color-text-primary);
+  background: rgba(255, 255, 255, 0.58);
+  text-decoration: none;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.terra-footer__link:hover,
+.terra-footer__link:focus-visible {
+  color: #18312a;
+  border-color: rgba(24, 49, 42, 0.28);
+  background: rgba(255, 255, 255, 0.86);
+  transform: translateY(-1px);
 }
 
 .terra-footer__value {
@@ -54,5 +86,9 @@
   .terra-footer__section,
   .terra-footer__section--credit {
     width: 100%;
+  }
+
+  .terra-footer__section--credit {
+    justify-content: space-between;
   }
 }

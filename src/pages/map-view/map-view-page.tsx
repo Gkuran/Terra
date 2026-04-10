@@ -424,8 +424,10 @@ export function MapViewPage({
       ) : null}
 
       <TerraFooter
-        credit="Created by Gabriel Adornes"
+        credit="Developed by Gabriel Adornes"
+        githubUrl="https://github.com/Gkuran"
         hoverTarget={hoverTargetLabel}
+        linkedinUrl="https://www.linkedin.com/in/gabriel-adornes-58a86b218"
       />
 
       <UploadShapefileModal

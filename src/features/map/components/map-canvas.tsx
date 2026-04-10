@@ -11,7 +11,6 @@ import Map, {
   type MapRef,
   NavigationControl,
   Popup,
-  ScaleControl,
   Source,
   type MapLayerMouseEvent,
   type MapMouseEvent,
@@ -608,7 +607,6 @@ export function MapCanvas({
         reuseMaps
       >
         <NavigationControl position="top-right" showCompass={false} />
-        <ScaleControl position="bottom-right" />
 
         {environmentalLayers.map(renderEnvironmentalLayer)}
 

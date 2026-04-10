@@ -2,7 +2,7 @@ import type { FeatureCollection, Geometry } from 'geojson'
 
 import type { FeatureProperties } from '@/entities/geographic-feature/model/geographic-feature'
 
-export type ConnectorSourceType = 'csv' | 'gbif' | 'shapefile'
+export type ConnectorSourceType = 'csv' | 'gbif' | 'shapefile' | 'macrostrat' | 'wosis'
 export type ConnectorContext = 'bbox' | 'manual'
 export type ConnectorDatasetTone =
   | 'copper'

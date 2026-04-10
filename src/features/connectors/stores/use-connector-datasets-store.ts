@@ -9,7 +9,7 @@ import type { ConnectorDataset } from '@/features/connectors/types/connector-dat
 const connectorFeaturePropertiesSchema = z.object({
   id: z.string(),
   title: z.string(),
-  category: z.enum(['flora', 'fauna', 'biome', 'soil', 'dataset']),
+  category: z.enum(['flora', 'fauna', 'biome', 'soil', 'dataset', 'geology']),
   scientificName: z.string().optional(),
   biome: z.string(),
   municipality: z.string(),
@@ -35,7 +35,7 @@ const connectorDatasetSchema = z.object({
   importedAt: z.string(),
   isVisible: z.boolean(),
   label: z.string(),
-  sourceType: z.enum(['csv', 'gbif', 'shapefile']),
+  sourceType: z.enum(['csv', 'gbif', 'shapefile', 'macrostrat', 'wosis']),
   tone: z.enum(['copper', 'moss', 'ocean', 'plum', 'amber', 'olive']),
   collection: z.object({
     type: z.literal('FeatureCollection'),

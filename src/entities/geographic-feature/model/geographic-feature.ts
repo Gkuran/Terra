@@ -5,7 +5,7 @@ export type GeographicFeature = Feature<Geometry, GeoJsonProperties>
 export type FeatureProperties = GeoJsonProperties & {
   id: string
   title: string
-  category: 'flora' | 'fauna' | 'biome' | 'soil' | 'dataset'
+  category: 'flora' | 'fauna' | 'biome' | 'soil' | 'geology' | 'dataset'
   scientificName?: string
   biome: string
   municipality: string

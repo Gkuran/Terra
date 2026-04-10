@@ -18,7 +18,8 @@ import type { FeatureProperties } from '@/entities/geographic-feature/model/geog
 import { ConnectorLegendPanel } from '@/features/connectors/components/connector-legend-panel'
 import { ConnectorResultsPanel } from '@/features/connectors/components/connector-results-panel'
 import { ConnectorsModal } from '@/features/connectors/components/connectors-modal'
-import { searchOccurrencesByBbox } from '@/features/connectors/bbox/lib/search-occurrences-by-bbox'
+import { AreaQuerySourcesPanel } from '@/features/connectors/components/area-query-sources-panel'
+import { searchAreaDataByBbox } from '@/features/connectors/bbox/lib/search-area-data-by-bbox'
 import { useConnectorDatasetsStore } from '@/features/connectors/stores/use-connector-datasets-store'
 import type { LayerMetadata } from '@/entities/layer/model/layer-metadata'
 import { EnvironmentalContextPanel } from '@/features/environmental-layers/components/environmental-context-panel'
@@ -108,29 +109,50 @@ export function MapViewPage({
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
   const [isConnectorsModalOpen, setIsConnectorsModalOpen] = useState(false)
   const [activePanel, setActivePanel] = useState<'session' | 'layers' | null>(null)
+  const [includeGbifInAreaQuery, setIncludeGbifInAreaQuery] = useState(true)
+  const [includeMacrostratInAreaQuery, setIncludeMacrostratInAreaQuery] = useState(true)
   const visibleEnvironmentalLayers = useMemo(
     () => environmentalLayers.filter((layer) => layer.isVisible),
     [environmentalLayers],
   )
   const bboxSearchMutation = useMutation({
-    mutationFn: searchOccurrencesByBbox,
+    mutationFn: searchAreaDataByBbox,
     onMutate: () => {
       setBboxSearchError(null)
     },
-    onSuccess: ({ featureCollection, queryLabel, resultCount }) => {
-      addConnectorDataset({
-        collection: featureCollection,
-        context: 'bbox',
-        label: queryLabel,
-        sourceType: 'gbif',
-      })
+    onSuccess: ({ gbif, macrostrat, warnings }) => {
+      if (gbif) {
+        addConnectorDataset({
+          collection: gbif.featureCollection,
+          context: 'bbox',
+          label: gbif.queryLabel,
+          sourceType: 'gbif',
+        })
+      }
+
+      if (macrostrat) {
+        addConnectorDataset({
+          collection: macrostrat.featureCollection,
+          context: 'bbox',
+          label: 'Macrostrat geology',
+          sourceType: 'macrostrat',
+        })
+      }
+
       setLastUploadResult({
         id: `bbox-${Date.now()}`,
-        sourceName: queryLabel,
-        featureCount: resultCount,
+        sourceName: 'Area query',
+        featureCount: (gbif?.resultCount ?? 0) + (macrostrat?.resultCount ?? 0),
         importedAt: new Date().toISOString(),
         status: 'success',
-        message: 'Occurrences were fetched from the backend bbox search.',
+        message:
+          warnings.length > 0
+            ? `Area query completed with warnings: ${warnings.join(' | ')}`
+            : gbif && macrostrat
+              ? 'Fauna, flora, and Macrostrat geology were fetched from the selected area.'
+              : gbif
+                ? 'Fauna and flora occurrences were fetched from the selected area.'
+                : 'Macrostrat geologic units were fetched from the selected area.',
       })
     },
     onError: (error) => {
@@ -209,6 +231,24 @@ export function MapViewPage({
       0,
     )
   const bboxDatasets = connectorDatasets.filter((dataset) => dataset.context === 'bbox')
+  const bboxOccurrenceDatasets = bboxDatasets.filter(
+    (dataset) => dataset.sourceType === 'gbif',
+  )
+  const areaQueryLoadingLabel = useMemo(() => {
+    if (includeGbifInAreaQuery && includeMacrostratInAreaQuery) {
+      return 'Querying GBIF occurrences and Macrostrat geology for the selected area.'
+    }
+
+    if (includeGbifInAreaQuery) {
+      return 'Querying GBIF occurrences for the selected area.'
+    }
+
+    if (includeMacrostratInAreaQuery) {
+      return 'Querying Macrostrat geologic units for the selected area.'
+    }
+
+    return 'Select at least one source for the area query.'
+  }, [includeGbifInAreaQuery, includeMacrostratInAreaQuery])
 
   function handleUploadComplete(
     collection: FeatureCollection<Geometry, FeatureProperties>,
@@ -241,7 +281,11 @@ export function MapViewPage({
 
   function handleBoundingBoxComplete(bbox: MapBoundingBox) {
     setBboxSearchError(null)
-    bboxSearchMutation.mutate(bbox)
+    bboxSearchMutation.mutate({
+      bbox,
+      includeGbif: includeGbifInAreaQuery,
+      includeMacrostrat: includeMacrostratInAreaQuery,
+    })
   }
 
   return (
@@ -271,7 +315,7 @@ export function MapViewPage({
       <QueryFeedbackBanner
         errorMessage={bboxSearchError}
         isLoading={bboxSearchMutation.isPending}
-        loadingLabel="Querying fauna and flora observations for the selected area."
+        loadingLabel={areaQueryLoadingLabel}
         onDismissError={() => setBboxSearchError(null)}
       />
 
@@ -295,9 +339,9 @@ export function MapViewPage({
         </aside>
       ) : null}
 
-      {bboxDatasets.length > 0 ? (
+      {bboxOccurrenceDatasets.length > 0 ? (
         <aside className="map-view-page__results">
-          <ConnectorResultsPanel datasets={bboxDatasets} />
+          <ConnectorResultsPanel datasets={bboxOccurrenceDatasets} />
         </aside>
       ) : null}
 
@@ -352,6 +396,17 @@ export function MapViewPage({
                     <strong>{lastUploadResult?.sourceName ?? 'Ready to import'}</strong>
                   </div>
                 </div>
+
+                <AreaQuerySourcesPanel
+                  includeGbif={includeGbifInAreaQuery}
+                  includeMacrostrat={includeMacrostratInAreaQuery}
+                  onToggleGbif={() =>
+                    setIncludeGbifInAreaQuery((currentValue) => !currentValue)
+                  }
+                  onToggleMacrostrat={() =>
+                    setIncludeMacrostratInAreaQuery((currentValue) => !currentValue)
+                  }
+                />
 
                 {stateMessage ? (
                   <Alert

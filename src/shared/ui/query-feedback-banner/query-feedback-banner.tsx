@@ -36,11 +36,11 @@ export function QueryFeedbackBanner({
 
           {errorMessage ? (
             <div className="query-feedback-banner__error">
-              <Alert heading="Bounding box search" variant="danger">
+              <Alert heading="Area query" variant="danger">
                 {errorMessage}
               </Alert>
               <button
-                aria-label="Dismiss bounding box search error"
+                aria-label="Dismiss area query error"
                 className="query-feedback-banner__dismiss"
                 onClick={onDismissError}
                 type="button"

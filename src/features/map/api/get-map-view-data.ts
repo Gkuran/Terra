@@ -19,13 +19,14 @@ const datasets: DatasetMetadata[] = [
   {
     id: 'connector-workspace',
     name: 'Connector Workspace',
-    description: 'Import scientific datasets from connectors to start the session.',
+    description:
+      'Combine fauna, flora, and environmental layers in a single scientific map workspace.',
     category: 'biome',
     regionLabel: 'No active region',
     featureCount: 0,
     updatedAt: '2026-04-07T12:00:00.000Z',
     status: 'ready',
-    tags: ['connectors', 'session'],
+    tags: ['observations', 'environment', 'session'],
   },
 ]
 

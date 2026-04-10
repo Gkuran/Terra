@@ -1,0 +1,39 @@
+.environmental-context-panel {
+  width: 100%;
+}
+
+.environmental-context-panel__content,
+.environmental-context-panel__grid,
+.environmental-context-panel__list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.environmental-context-panel__summary,
+.environmental-context-panel__item span {
+  color: var(--boulder-color-text-secondary);
+}
+
+.environmental-context-panel__summary {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.environmental-context-panel__grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.environmental-context-panel__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.environmental-context-panel__item {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.85rem 0.9rem;
+  border: 1px solid var(--boulder-color-border);
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.64);
+}

@@ -1,6 +1,6 @@
 import type { ChangeEvent } from 'react'
 import { useId, useMemo, useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import {
   Alert,
   Card,
@@ -21,6 +21,11 @@ import { ConnectorsModal } from '@/features/connectors/components/connectors-mod
 import { searchOccurrencesByBbox } from '@/features/connectors/bbox/lib/search-occurrences-by-bbox'
 import { useConnectorDatasetsStore } from '@/features/connectors/stores/use-connector-datasets-store'
 import type { LayerMetadata } from '@/entities/layer/model/layer-metadata'
+import { EnvironmentalContextPanel } from '@/features/environmental-layers/components/environmental-context-panel'
+import { EnvironmentalLayersPanel } from '@/features/environmental-layers/components/environmental-layers-panel'
+import { EnvironmentalPointSamplePanel } from '@/features/environmental-layers/components/environmental-point-sample-panel'
+import { requestSoilGridsPointSample } from '@/features/environmental-layers/api/request-soilgrids-point-sample'
+import { useEnvironmentalLayersStore } from '@/features/environmental-layers/stores/use-environmental-layers-store'
 import { FeatureInspectorPanel } from '@/features/feature-inspector/components/feature-inspector-panel'
 import { LayerControlPanel } from '@/features/layers/components/layer-control-panel'
 import type { MapViewScenario } from '@/features/map/api/get-map-view-data'
@@ -70,8 +75,14 @@ export function MapViewPage({
   const datasetFieldId = useId()
   const scenarioFieldId = useId()
   const selection = useMapUiStore((state) => state.selection)
+  const environmentalProbeCoordinates = useMapUiStore(
+    (state) => state.environmentalProbeCoordinates,
+  )
   const hoveredFeatureId = useMapUiStore((state) => state.hoveredFeatureId)
   const setHoveredFeatureId = useMapUiStore((state) => state.setHoveredFeatureId)
+  const setEnvironmentalProbeCoordinates = useMapUiStore(
+    (state) => state.setEnvironmentalProbeCoordinates,
+  )
   const setSelection = useMapUiStore((state) => state.setSelection)
   const connectorDatasets = useConnectorDatasetsStore((state) => state.datasets)
   const addConnectorDataset = useConnectorDatasetsStore((state) => state.addDataset)
@@ -80,12 +91,27 @@ export function MapViewPage({
   const setDatasetVisibility = useConnectorDatasetsStore(
     (state) => state.setDatasetVisibility,
   )
+  const environmentalLayers = useEnvironmentalLayersStore((state) => state.layers)
+  const addEnvironmentalLayer = useEnvironmentalLayersStore((state) => state.addLayer)
+  const removeEnvironmentalLayer = useEnvironmentalLayersStore(
+    (state) => state.removeLayer,
+  )
+  const setEnvironmentalLayerOpacity = useEnvironmentalLayersStore(
+    (state) => state.setLayerOpacity,
+  )
+  const setEnvironmentalLayerVisibility = useEnvironmentalLayersStore(
+    (state) => state.setLayerVisibility,
+  )
   const [lastUploadResult, setLastUploadResult] = useState<UploadResult | null>(null)
   const [bboxSearchError, setBboxSearchError] = useState<string | null>(null)
   const [focusDatasetId, setFocusDatasetId] = useState<string | null>(null)
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
   const [isConnectorsModalOpen, setIsConnectorsModalOpen] = useState(false)
   const [activePanel, setActivePanel] = useState<'session' | 'layers' | null>(null)
+  const visibleEnvironmentalLayers = useMemo(
+    () => environmentalLayers.filter((layer) => layer.isVisible),
+    [environmentalLayers],
+  )
   const bboxSearchMutation = useMutation({
     mutationFn: searchOccurrencesByBbox,
     onMutate: () => {
@@ -110,6 +136,27 @@ export function MapViewPage({
     onError: (error) => {
       setBboxSearchError(error.message)
     },
+  })
+  const soilGridsPointSampleQuery = useQuery({
+    enabled:
+      visibleEnvironmentalLayers.length > 0 &&
+      environmentalProbeCoordinates !== null,
+    queryKey: [
+      'soilgrids-point-sample',
+      environmentalProbeCoordinates?.[0] ?? 'none',
+      environmentalProbeCoordinates?.[1] ?? 'none',
+      visibleEnvironmentalLayers.map((layer) => layer.id).join('|'),
+    ],
+    queryFn: () =>
+      requestSoilGridsPointSample({
+        lon: environmentalProbeCoordinates?.[0] ?? 0,
+        lat: environmentalProbeCoordinates?.[1] ?? 0,
+        layers: visibleEnvironmentalLayers.map((layer) => ({
+          propertyId: layer.propertyId,
+          depthId: layer.depthId,
+          statisticId: layer.statisticId,
+        })),
+      }),
   })
   const selectedFeature = useMemo(
     () => {
@@ -181,6 +228,7 @@ export function MapViewPage({
     setFocusDatasetId(null)
     setHoveredFeatureId(null)
     setSelection(null)
+    setEnvironmentalProbeCoordinates(null)
   }
 
   function handleDatasetChange(event: ChangeEvent<HTMLSelectElement>) {
@@ -202,6 +250,7 @@ export function MapViewPage({
 
       <MapCanvas
         connectorDatasets={connectorDatasets}
+        environmentalLayers={environmentalLayers}
         focusDatasetId={focusDatasetId}
         features={features}
         layers={layers}
@@ -222,7 +271,7 @@ export function MapViewPage({
       <QueryFeedbackBanner
         errorMessage={bboxSearchError}
         isLoading={bboxSearchMutation.isPending}
-        loadingLabel="Querying fauna and flora occurrences for the selected area."
+        loadingLabel="Querying fauna and flora observations for the selected area."
         onDismissError={() => setBboxSearchError(null)}
       />
 
@@ -316,21 +365,52 @@ export function MapViewPage({
               </CardContent>
             </Card>
           ) : (
-            <LayerControlPanel
-              activeDataset={dataset}
-              layers={layers}
-            />
+            <div className="map-view-page__layer-panel-stack">
+              <LayerControlPanel
+                activeDataset={dataset}
+                layers={layers}
+              />
+              <EnvironmentalLayersPanel
+                layers={environmentalLayers}
+                onRemoveLayer={(layerId) => {
+                  removeEnvironmentalLayer(layerId)
+
+                  if (
+                    environmentalLayers.filter((layer) => layer.id !== layerId).length === 0
+                  ) {
+                    setEnvironmentalProbeCoordinates(null)
+                  }
+                }}
+                onSetLayerOpacity={setEnvironmentalLayerOpacity}
+                onSetLayerVisibility={setEnvironmentalLayerVisibility}
+              />
+            </div>
           )}
         </aside>
       ) : null}
 
-      {selectedFeature ? (
+      {selectedFeature || environmentalLayers.length > 0 ? (
         <aside className="map-view-page__inspector">
-          <FeatureInspectorPanel feature={selectedFeature} />
+          {selectedFeature ? <FeatureInspectorPanel feature={selectedFeature} /> : null}
+          <EnvironmentalContextPanel layers={environmentalLayers} />
+          <EnvironmentalPointSamplePanel
+            coordinates={environmentalProbeCoordinates}
+            errorMessage={
+              soilGridsPointSampleQuery.error instanceof Error
+                ? soilGridsPointSampleQuery.error.message
+                : null
+            }
+            isLoading={soilGridsPointSampleQuery.isLoading}
+            samples={soilGridsPointSampleQuery.data ?? []}
+          />
           <div className="map-view-page__inspector-summary">
             <div className="map-view-page__session-metric">
               <span>Visible features</span>
               <strong>{visibleFeatureCount}</strong>
+            </div>
+            <div className="map-view-page__session-metric">
+              <span>Environmental layers</span>
+              <strong>{visibleEnvironmentalLayers.length}</strong>
             </div>
             <div className="map-view-page__session-metric">
               <span>Status</span>
@@ -378,6 +458,11 @@ export function MapViewPage({
             status: 'success',
             message: 'Occurrences were fetched live from GBIF.',
           })
+          setIsConnectorsModalOpen(false)
+        }}
+        onAddEnvironmentalLayer={(layer) => {
+          addEnvironmentalLayer(layer)
+          setActivePanel('layers')
           setIsConnectorsModalOpen(false)
         }}
         onImportCsv={({ collection, sourceName }) => {

@@ -24,7 +24,7 @@ export function ConnectorLegendPanel({
   return (
     <Card className="connector-legend-panel" variant="default">
       <CardHeader className="connector-legend-panel__header">
-        <CardTitle as="h3">Connected datasets</CardTitle>
+        <CardTitle as="h3">Observation layers</CardTitle>
         <AppButton onClick={onClearAll} variant="secondary">
           Clear all
         </AppButton>

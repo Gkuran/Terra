@@ -15,6 +15,7 @@ const gbifOccurrenceSchema = z.object({
   stateProvince: z.string().optional(),
   municipality: z.string().optional(),
   country: z.string().optional(),
+  kingdom: z.string().optional(),
   issues: z.array(z.string()).optional(),
 })
 
@@ -73,7 +74,12 @@ export async function searchGbifOccurrences({
       properties: {
         id: `gbif-occurrence-${occurrence.key}`,
         title: occurrence.scientificName ?? `GBIF occurrence ${index + 1}`,
-        category: 'dataset',
+        category:
+          occurrence.kingdom === 'Plantae'
+            ? 'flora'
+            : occurrence.kingdom === 'Animalia'
+              ? 'fauna'
+              : 'dataset',
         scientificName: occurrence.scientificName,
         biome: occurrence.country ?? 'GBIF',
         municipality:
@@ -93,6 +99,7 @@ export async function searchGbifOccurrences({
           stateProvince: occurrence.stateProvince ?? '',
           municipality: occurrence.municipality ?? '',
           country: occurrence.country ?? '',
+          kingdom: occurrence.kingdom ?? '',
           issues: occurrence.issues?.join(', ') ?? '',
         },
       },

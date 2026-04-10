@@ -20,6 +20,7 @@ import Map, {
 
 import type { LayerMetadata } from '@/entities/layer/model/layer-metadata'
 import type { ConnectorDataset } from '@/features/connectors/types/connector-dataset'
+import type { EnvironmentalLayer } from '@/features/environmental-layers/types/environmental-layer'
 import { useLayerPresentationStore } from '@/features/layers/stores/use-layer-presentation-store'
 import { useMapUiStore } from '@/features/map/stores/use-map-ui-store'
 import type { MapBoundingBox } from '@/features/map/types/map-bounding-box'
@@ -46,6 +47,41 @@ const baseMapStyle: StyleSpecification = {
   ],
 }
 
+const analysisMapStyle: StyleSpecification = {
+  version: 8,
+  sources: {
+    'carto-light-nolabels': {
+      type: 'raster',
+      tiles: ['https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png'],
+      tileSize: 256,
+      attribution:
+        '&copy; OpenStreetMap contributors &copy; CARTO',
+    },
+    'carto-light-labels': {
+      type: 'raster',
+      tiles: ['https://a.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png'],
+      tileSize: 256,
+      attribution:
+        '&copy; OpenStreetMap contributors &copy; CARTO',
+    },
+  },
+  layers: [
+    {
+      id: 'carto-light-nolabels',
+      type: 'raster',
+      source: 'carto-light-nolabels',
+    },
+    {
+      id: 'carto-light-labels',
+      type: 'raster',
+      source: 'carto-light-labels',
+      paint: {
+        'raster-opacity': 0.92,
+      },
+    },
+  ],
+}
+
 const initialViewState = {
   longitude: -51.15,
   latitude: -29.92,
@@ -56,6 +92,7 @@ interface MapCanvasProps {
   features: FeatureCollection<Geometry, GeoJsonProperties>
   layers: LayerMetadata[]
   connectorDatasets: ConnectorDataset[]
+  environmentalLayers: EnvironmentalLayer[]
   focusDatasetId: string | null
   onFocusHandled: () => void
   onBoundingBoxComplete: (bbox: MapBoundingBox) => void
@@ -145,6 +182,7 @@ export function MapCanvas({
   features,
   layers,
   connectorDatasets,
+  environmentalLayers,
   focusDatasetId,
   onFocusHandled,
   onBoundingBoxComplete,
@@ -155,9 +193,13 @@ export function MapCanvas({
   const activeTool = useMapUiStore((state) => state.activeTool)
   const selection = useMapUiStore((state) => state.selection)
   const setSelection = useMapUiStore((state) => state.setSelection)
+  const setEnvironmentalProbeCoordinates = useMapUiStore(
+    (state) => state.setEnvironmentalProbeCoordinates,
+  )
   const hoveredFeatureId = useMapUiStore((state) => state.hoveredFeatureId)
   const setHoveredFeatureId = useMapUiStore((state) => state.setHoveredFeatureId)
   const [bboxDraft, setBboxDraft] = useState<BoundingBoxDraft | null>(null)
+  const hasVisibleEnvironmentalLayers = environmentalLayers.some((layer) => layer.isVisible)
 
   const selectedFeature = useMemo(
     () =>
@@ -291,6 +333,10 @@ export function MapCanvas({
       return
     }
 
+    if (hasVisibleEnvironmentalLayers) {
+      setEnvironmentalProbeCoordinates([event.lngLat.lng, event.lngLat.lat])
+    }
+
     const [topFeature] = event.features ?? []
 
     if (!topFeature || !topFeature.properties) {
@@ -350,7 +396,7 @@ export function MapCanvas({
 
     setSelection(null)
     setHoveredFeatureId(null)
-    setBboxDraft({
+      setBboxDraft({
       start: [event.lngLat.lng, event.lngLat.lat],
       current: [event.lngLat.lng, event.lngLat.lat],
     })
@@ -515,6 +561,30 @@ export function MapCanvas({
     )
   }
 
+  function renderEnvironmentalLayer(layer: EnvironmentalLayer) {
+    if (!layer.isVisible) {
+      return null
+    }
+
+    return (
+      <Source
+        id={layer.id}
+        key={layer.id}
+        tileSize={256}
+        tiles={[layer.tileUrlTemplate]}
+        type="raster"
+      >
+        <Layer
+          id={`${layer.id}-raster`}
+          paint={{
+            'raster-opacity': layer.opacity,
+          }}
+          type="raster"
+        />
+      </Source>
+    )
+  }
+
   return (
     <section className="map-canvas" aria-label="Terra map canvas">
       <Map
@@ -522,7 +592,13 @@ export function MapCanvas({
         dragPan={activeTool !== 'bbox'}
         initialViewState={initialViewState}
         interactiveLayerIds={interactiveLayerIds}
-        mapStyle={env.VITE_MAP_STYLE_URL ?? baseMapStyle}
+        mapStyle={
+          env.VITE_MAP_STYLE_URL
+            ? env.VITE_MAP_STYLE_URL
+            : hasVisibleEnvironmentalLayers
+              ? analysisMapStyle
+              : baseMapStyle
+        }
         onClick={handleMapClick}
         onMouseLeave={() => setHoveredFeatureId(null)}
         onMouseMove={handleMapMouseMove}
@@ -533,6 +609,8 @@ export function MapCanvas({
       >
         <NavigationControl position="top-right" showCompass={false} />
         <ScaleControl position="bottom-right" />
+
+        {environmentalLayers.map(renderEnvironmentalLayer)}
 
         <Source data={features} id="dataset-features" type="geojson">
           {layers.map(renderLayer)}

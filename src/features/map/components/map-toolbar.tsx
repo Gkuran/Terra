@@ -53,10 +53,10 @@ export function MapToolbar({
           <LuGalleryVerticalEnd aria-hidden="true" />
         </AppButton>
         <AppButton
-          aria-label="Open data connectors"
+          aria-label="Open data sources"
           className="map-toolbar__button"
           onClick={onOpenConnectors}
-          title="Connectors"
+          title="Sources"
           variant="secondary"
         >
           <LuPlugZap aria-hidden="true" />

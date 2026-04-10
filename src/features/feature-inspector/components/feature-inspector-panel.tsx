@@ -19,10 +19,16 @@ interface FeatureInspectorPanelProps {
 }
 
 function formatObservedDate(isoDate: string) {
+  const parsedDate = new Date(isoDate)
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return 'Not provided'
+  }
+
   return new Intl.DateTimeFormat('en-US', {
     dateStyle: 'medium',
     timeStyle: 'short',
-  }).format(new Date(isoDate))
+  }).format(parsedDate)
 }
 
 function formatAttributeLabel(key: string) {
@@ -57,6 +63,11 @@ export function FeatureInspectorPanel({ feature }: FeatureInspectorPanelProps) {
           <p className="feature-inspector-panel__summary">{properties.summary}</p>
 
           <div className="feature-inspector-panel__grid">
+            <DataAttribute
+              label="Category"
+              orientation="vertical"
+              value={properties.category}
+            />
             <DataAttribute
               label="Biome"
               orientation="vertical"

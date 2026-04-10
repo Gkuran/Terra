@@ -55,6 +55,11 @@
   width: 100%;
 }
 
+.map-view-page__layer-panel-stack {
+  display: grid;
+  gap: 0.75rem;
+}
+
 .map-view-page__workspace-card-content {
   display: grid;
   gap: 1rem;

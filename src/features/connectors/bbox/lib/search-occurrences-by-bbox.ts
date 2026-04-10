@@ -8,7 +8,7 @@ import { env } from '@/shared/config/env'
 const backendFeaturePropertiesSchema = z.object({
   id: z.string(),
   title: z.string(),
-  category: z.literal('dataset'),
+  category: z.enum(['dataset', 'flora', 'fauna']),
   scientificName: z.string().nullable().optional(),
   biome: z.string(),
   municipality: z.string(),

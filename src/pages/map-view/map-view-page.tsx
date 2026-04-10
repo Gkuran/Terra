@@ -9,6 +9,10 @@ import { ConnectorResultsPanel } from '@/features/connectors/components/connecto
 import { ConnectorsModal } from '@/features/connectors/components/connectors-modal'
 import { AreaQuerySettingsModal } from '@/features/connectors/components/area-query-settings-modal'
 import { searchAreaDataByBbox } from '@/features/connectors/bbox/lib/search-area-data-by-bbox'
+import {
+  extractGbifOccurrenceKey,
+  requestGbifOccurrenceDetail,
+} from '@/features/connectors/gbif/api/request-gbif-occurrence-detail'
 import { useConnectorDatasetsStore } from '@/features/connectors/stores/use-connector-datasets-store'
 import type { LayerMetadata } from '@/entities/layer/model/layer-metadata'
 import { EnvironmentalContextPanel } from '@/features/environmental-layers/components/environmental-context-panel'
@@ -199,6 +203,16 @@ export function MapViewPage({
     },
     [connectorDatasets, features.features, hoveredFeatureId],
   )
+  const selectedGbifOccurrenceKey = useMemo(() => {
+    if (!selectedFeature?.properties?.id) {
+      return null
+    }
+
+    return extractGbifOccurrenceKey(
+      selectedFeature.properties.id,
+      selectedFeature.properties.rawAttributes,
+    )
+  }, [selectedFeature])
   const hoverTargetLabel =
     hoveredFeature?.properties.scientificName ??
     hoveredFeature?.properties.title ??
@@ -230,6 +244,11 @@ export function MapViewPage({
 
     return 'Select at least one source for the area query.'
   }, [includeGbifInAreaQuery, includeMacrostratInAreaQuery])
+  const gbifOccurrenceDetailQuery = useQuery({
+    enabled: selectedGbifOccurrenceKey !== null,
+    queryKey: ['gbif-occurrence-detail', selectedGbifOccurrenceKey ?? 'none'],
+    queryFn: () => requestGbifOccurrenceDetail(selectedGbifOccurrenceKey ?? 0),
+  })
 
   useEffect(() => {
     if (!selectedFeature || !rightSidebarRef.current) {
@@ -348,7 +367,18 @@ export function MapViewPage({
 
       {selectedFeature || bboxOccurrenceDatasets.length > 0 || environmentalLayers.length > 0 ? (
         <aside className="map-view-page__inspector" ref={rightSidebarRef}>
-          {selectedFeature ? <FeatureInspectorPanel feature={selectedFeature} /> : null}
+          {selectedFeature ? (
+            <FeatureInspectorPanel
+              feature={selectedFeature}
+              gbifDetail={gbifOccurrenceDetailQuery.data ?? null}
+              gbifDetailError={
+                gbifOccurrenceDetailQuery.error instanceof Error
+                  ? gbifOccurrenceDetailQuery.error.message
+                  : null
+              }
+              isGbifDetailLoading={gbifOccurrenceDetailQuery.isLoading}
+            />
+          ) : null}
           {bboxOccurrenceDatasets.length > 0 ? (
             <ConnectorResultsPanel
               datasets={bboxOccurrenceDatasets}

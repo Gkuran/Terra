@@ -1,4 +1,5 @@
 import type { FeatureProperties } from '@/entities/geographic-feature/model/geographic-feature'
+import type { GbifOccurrenceDetail } from '@/features/connectors/gbif/api/request-gbif-occurrence-detail'
 import {
   Card,
   CardContent,
@@ -16,6 +17,9 @@ import './feature-inspector-panel.css'
 
 interface FeatureInspectorPanelProps {
   feature: Feature<Geometry, FeatureProperties> | null
+  gbifDetail?: GbifOccurrenceDetail | null
+  gbifDetailError?: string | null
+  isGbifDetailLoading?: boolean
 }
 
 function formatObservedDate(isoDate: string) {
@@ -38,10 +42,26 @@ function formatAttributeLabel(key: string) {
     .replace(/\b\w/g, (character) => character.toUpperCase())
 }
 
-export function FeatureInspectorPanel({ feature }: FeatureInspectorPanelProps) {
+export function FeatureInspectorPanel({
+  feature,
+  gbifDetail = null,
+  gbifDetailError = null,
+  isGbifDetailLoading = false,
+}: FeatureInspectorPanelProps) {
   const setSelection = useMapUiStore((state) => state.setSelection)
   const properties = feature?.properties ?? null
   const rawAttributes = Object.entries(properties?.rawAttributes ?? {})
+  const primaryMedia = gbifDetail?.media[0] ?? null
+  const taxonomyEntries = gbifDetail
+    ? [
+        ['Kingdom', gbifDetail.taxonomy.kingdom],
+        ['Phylum', gbifDetail.taxonomy.phylum],
+        ['Order', gbifDetail.taxonomy.order],
+        ['Family', gbifDetail.taxonomy.family],
+        ['Genus', gbifDetail.taxonomy.genus],
+        ['Species', gbifDetail.taxonomy.species],
+      ].filter((entry): entry is [string, string] => Boolean(entry[1]))
+    : []
 
   return (
     <Card className="feature-inspector-panel" variant="default">
@@ -51,7 +71,7 @@ export function FeatureInspectorPanel({ feature }: FeatureInspectorPanelProps) {
             {properties?.title ?? 'No selected feature'}
           </CardTitle>
           <CardDescription>
-            Selected polygon properties and inspection context.
+            Selected feature properties and inspection context.
           </CardDescription>
         </div>
       </CardHeader>
@@ -60,6 +80,21 @@ export function FeatureInspectorPanel({ feature }: FeatureInspectorPanelProps) {
         {properties ? (
           <>
           <StatusBadge label={properties.status} tone={properties.status} />
+          {primaryMedia ? (
+            <figure className="feature-inspector-panel__media">
+              <img
+                alt={gbifDetail?.scientificName ?? properties.title}
+                className="feature-inspector-panel__media-image"
+                src={primaryMedia.cachedUrl}
+              />
+              <figcaption className="feature-inspector-panel__media-caption">
+                <span>{primaryMedia.title ?? 'Occurrence media'}</span>
+                <span>
+                  {primaryMedia.license ?? gbifDetail?.license ?? 'License not provided'}
+                </span>
+              </figcaption>
+            </figure>
+          ) : null}
           <p className="feature-inspector-panel__summary">{properties.summary}</p>
 
           <div className="feature-inspector-panel__grid">
@@ -81,14 +116,106 @@ export function FeatureInspectorPanel({ feature }: FeatureInspectorPanelProps) {
             <DataAttribute
               label="Scientific name"
               orientation="vertical"
-              value={properties.scientificName ?? 'Not provided'}
+              value={gbifDetail?.scientificName ?? properties.scientificName ?? 'Not provided'}
             />
             <DataAttribute
               label="Observed at"
               orientation="vertical"
-              value={formatObservedDate(properties.observedAt)}
+              value={
+                gbifDetail?.eventDate
+                  ? formatObservedDate(gbifDetail.eventDate)
+                  : formatObservedDate(properties.observedAt)
+              }
             />
           </div>
+
+          {isGbifDetailLoading ? (
+            <p className="feature-inspector-panel__note">
+              Loading GBIF occurrence detail.
+            </p>
+          ) : null}
+
+          {gbifDetailError ? (
+            <p className="feature-inspector-panel__note feature-inspector-panel__note--error">
+              {gbifDetailError}
+            </p>
+          ) : null}
+
+          {gbifDetail ? (
+            <>
+              <div className="feature-inspector-panel__grid">
+                <DataAttribute
+                  label="Basis of record"
+                  orientation="vertical"
+                  value={gbifDetail.basisOfRecord ?? 'Not provided'}
+                />
+                <DataAttribute
+                  label="Recorded by"
+                  orientation="vertical"
+                  value={gbifDetail.recordedBy ?? 'Not provided'}
+                />
+                <DataAttribute
+                  label="Dataset"
+                  orientation="vertical"
+                  value={gbifDetail.datasetName ?? 'Not provided'}
+                />
+                <DataAttribute
+                  label="Publisher"
+                  orientation="vertical"
+                  value={gbifDetail.publisher ?? 'Not provided'}
+                />
+                <DataAttribute
+                  label="Locality"
+                  orientation="vertical"
+                  value={gbifDetail.locality ?? 'Not provided'}
+                />
+                <DataAttribute
+                  label="Occurrence key"
+                  orientation="vertical"
+                  value={`${gbifDetail.occurrenceKey}`}
+                />
+              </div>
+
+              {taxonomyEntries.length > 0 ? (
+                <div className="feature-inspector-panel__attributes">
+                  <h4 className="feature-inspector-panel__attributes-title">
+                    Taxonomy
+                  </h4>
+                  <div className="feature-inspector-panel__grid">
+                    {taxonomyEntries.map(([label, value]) => (
+                      <DataAttribute
+                        key={label}
+                        label={label}
+                        orientation="vertical"
+                        value={value}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="feature-inspector-panel__links">
+                <a
+                  className="feature-inspector-panel__link"
+                  href={gbifDetail.gbifUrl}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  Open on GBIF
+                </a>
+                {gbifDetail.references ? (
+                  <a
+                    className="feature-inspector-panel__link"
+                    href={gbifDetail.references}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    Open source record
+                  </a>
+                ) : null}
+              </div>
+            </>
+          ) : null}
 
           {rawAttributes.length > 0 ? (
             <div className="feature-inspector-panel__attributes">

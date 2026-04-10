@@ -45,6 +45,29 @@
   box-shadow: inset 0 0 0 1px rgba(18, 31, 26, 0.14);
 }
 
+.connector-legend-panel__gbif-icons {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: none;
+}
+
+.connector-legend-panel__gbif-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(18, 31, 26, 0.08);
+}
+
+.connector-legend-panel__gbif-icon svg {
+  width: 1rem;
+  height: 1rem;
+}
+
 .connector-legend-panel__swatch--copper {
   background: #8a5a36;
 }

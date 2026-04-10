@@ -1,5 +1,4 @@
-.area-query-sources-panel__header,
-.area-query-sources-panel__content {
+.area-query-sources-panel {
   display: grid;
   gap: 0.75rem;
 }

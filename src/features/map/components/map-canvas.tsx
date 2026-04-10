@@ -8,12 +8,13 @@ import type {
 } from 'geojson'
 import Map, {
   Layer,
+  type MapLayerMouseEvent,
   type MapRef,
   NavigationControl,
+  type MapMouseEvent,
+  type MapStyleDataEvent,
   Popup,
   Source,
-  type MapLayerMouseEvent,
-  type MapMouseEvent,
   type StyleSpecification,
 } from 'react-map-gl/maplibre'
 
@@ -85,6 +86,31 @@ const initialViewState = {
   longitude: -51.15,
   latitude: -29.92,
   zoom: 7.2,
+}
+
+const floraIconId = 'terra-flora-marker'
+const faunaIconId = 'terra-fauna-marker'
+
+const floraIconMarkup = `
+<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">
+  <path d="M14 25c-1 0-1.8-.8-1.8-1.8v-4.3c0-2.9 1.4-5.4 3.6-7-4.7.4-8.4-1.8-10.7-6.4C8.4 2.8 12 2 15.6 3c2.4.7 4.2 2.3 5.2 4.7 2.5-2 5.1-2.2 7.8-.4-1.1 6.1-4.7 9.4-10.5 9.8-2.6.2-4 1.6-4 4v2.1c0 1-.8 1.8-1.8 1.8Z" fill="#4f7d4c"/>
+  <path d="M14 20.5c-.3 0-.6-.1-.8-.3a1.2 1.2 0 0 1-.1-1.7l6.9-7.8c.4-.5 1.2-.5 1.7-.1s.5 1.2.1 1.7L14.9 20a1.2 1.2 0 0 1-.9.5Z" fill="#eff7e9"/>
+</svg>
+`
+
+const faunaIconMarkup = `
+<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">
+  <circle cx="8.1" cy="8.3" r="3.2" fill="#8a5a36"/>
+  <circle cx="19.9" cy="8.3" r="3.2" fill="#8a5a36"/>
+  <circle cx="5.4" cy="14.2" r="2.6" fill="#8a5a36"/>
+  <circle cx="22.6" cy="14.2" r="2.6" fill="#8a5a36"/>
+  <path d="M14 23.4c4.1 0 7.3-2.6 7.3-5.9 0-3.7-3.2-6.8-7.3-6.8s-7.3 3.1-7.3 6.8c0 3.3 3.2 5.9 7.3 5.9Z" fill="#8a5a36"/>
+  <path d="M11.3 17.8c0 1.2 1.2 2.1 2.7 2.1s2.7-.9 2.7-2.1" fill="none" stroke="#fff7e7" stroke-width="1.8" stroke-linecap="round"/>
+</svg>
+`
+
+function buildIconDataUrl(svgMarkup: string) {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgMarkup)}`
 }
 
 interface MapCanvasProps {
@@ -198,7 +224,58 @@ export function MapCanvas({
   const hoveredFeatureId = useMapUiStore((state) => state.hoveredFeatureId)
   const setHoveredFeatureId = useMapUiStore((state) => state.setHoveredFeatureId)
   const [bboxDraft, setBboxDraft] = useState<BoundingBoxDraft | null>(null)
+  const [areConnectorIconsReady, setAreConnectorIconsReady] = useState(false)
   const hasVisibleEnvironmentalLayers = environmentalLayers.some((layer) => layer.isVisible)
+
+  async function ensureConnectorIconsLoaded() {
+    if (!mapRef.current) {
+      return
+    }
+
+    const map = mapRef.current.getMap()
+
+    const loadIcon = async (iconId: string, svgMarkup: string) => {
+      if (map.hasImage(iconId)) {
+        return
+      }
+
+      const image = new Image(28, 28)
+      image.src = buildIconDataUrl(svgMarkup)
+      await image.decode()
+
+      if (!map.hasImage(iconId)) {
+        map.addImage(iconId, image)
+      }
+    }
+
+    await Promise.all([
+      loadIcon(floraIconId, floraIconMarkup),
+      loadIcon(faunaIconId, faunaIconMarkup),
+    ])
+
+    setAreConnectorIconsReady(true)
+  }
+
+  function handleMapLoad() {
+    void ensureConnectorIconsLoaded()
+  }
+
+  function handleMapStyleData(_event: MapStyleDataEvent) {
+    if (!areConnectorIconsReady) {
+      void ensureConnectorIconsLoaded()
+      return
+    }
+
+    const map = mapRef.current?.getMap()
+    if (!map) {
+      return
+    }
+
+    if (!map.hasImage(floraIconId) || !map.hasImage(faunaIconId)) {
+      setAreConnectorIconsReady(false)
+      void ensureConnectorIconsLoaded()
+    }
+  }
 
   const selectedFeature = useMemo(
     () =>
@@ -220,12 +297,30 @@ export function MapCanvas({
       ...buildInteractiveLayerIds(layers),
       ...connectorDatasets.flatMap((dataset) =>
         dataset.isVisible
-          ? [`${dataset.id}-fill`, `${dataset.id}-line`, `${dataset.id}-circle`]
+          ? [
+              `${dataset.id}-fill`,
+              `${dataset.id}-line`,
+              ...(dataset.sourceType === 'gbif'
+                ? [`${dataset.id}-symbol`]
+                : dataset.sourceType === 'macrostrat'
+                  ? []
+                  : [`${dataset.id}-circle`]),
+            ]
           : [],
       ),
     ],
     [connectorDatasets, layers],
   )
+  const orderedConnectorDatasets = useMemo(() => {
+    const macrostratDatasets = connectorDatasets.filter(
+      (dataset) => dataset.sourceType === 'macrostrat',
+    )
+    const remainingDatasets = connectorDatasets.filter(
+      (dataset) => dataset.sourceType !== 'macrostrat',
+    )
+
+    return [...macrostratDatasets, ...remainingDatasets]
+  }, [connectorDatasets])
   const bboxPreview = useMemo<FeatureCollection<Geometry, GeoJsonProperties> | null>(
     () => {
       if (!bboxDraft) {
@@ -481,6 +576,9 @@ export function MapCanvas({
       return null
     }
 
+    const shouldRenderSymbolLayer = dataset.sourceType === 'gbif'
+    const shouldRenderCircleLayer = dataset.sourceType !== 'macrostrat'
+
     return (
       <Source
         data={dataset.collection}
@@ -506,16 +604,48 @@ export function MapCanvas({
           }}
           type="line"
         />
-        <Layer
-          id={`${dataset.id}-circle`}
-          paint={{
-            'circle-color': dataset.color,
-            'circle-radius': 5,
-            'circle-stroke-color': '#fff7e7',
-            'circle-stroke-width': 1.5,
-          }}
-          type="circle"
-        />
+        {shouldRenderSymbolLayer && areConnectorIconsReady ? (
+          <Layer
+            id={`${dataset.id}-symbol`}
+            layout={{
+              'icon-allow-overlap': true,
+              'icon-ignore-placement': true,
+              'icon-image': [
+                'match',
+                ['get', 'category'],
+                'flora',
+                floraIconId,
+                'fauna',
+                faunaIconId,
+                faunaIconId,
+              ],
+              'icon-size': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                4,
+                0.45,
+                7,
+                0.58,
+                10,
+                0.72,
+              ],
+            }}
+            type="symbol"
+          />
+        ) : null}
+        {shouldRenderCircleLayer && !shouldRenderSymbolLayer ? (
+          <Layer
+            id={`${dataset.id}-circle`}
+            paint={{
+              'circle-color': dataset.color,
+              'circle-radius': 5,
+              'circle-stroke-color': '#fff7e7',
+              'circle-stroke-width': 1.5,
+            }}
+            type="circle"
+          />
+        ) : null}
         <Layer
           filter={['==', ['get', 'id'], hoveredFeatureId ?? '']}
           id={`${dataset.id}-hover-highlight-line`}
@@ -525,17 +655,19 @@ export function MapCanvas({
           }}
           type="line"
         />
-        <Layer
-          filter={['==', ['get', 'id'], hoveredFeatureId ?? '']}
-          id={`${dataset.id}-hover-highlight-circle`}
-          paint={{
-            'circle-color': '#18362a',
-            'circle-radius': 7,
-            'circle-stroke-color': '#fff7e7',
-            'circle-stroke-width': 2,
-          }}
-          type="circle"
-        />
+        {shouldRenderCircleLayer ? (
+          <Layer
+            filter={['==', ['get', 'id'], hoveredFeatureId ?? '']}
+            id={`${dataset.id}-hover-highlight-circle`}
+            paint={{
+              'circle-color': '#18362a',
+              'circle-radius': 7,
+              'circle-stroke-color': '#fff7e7',
+              'circle-stroke-width': 2,
+            }}
+            type="circle"
+          />
+        ) : null}
         <Layer
           filter={['==', ['get', 'id'], selection?.featureId ?? '']}
           id={`${dataset.id}-selection-highlight-line`}
@@ -545,17 +677,19 @@ export function MapCanvas({
           }}
           type="line"
         />
-        <Layer
-          filter={['==', ['get', 'id'], selection?.featureId ?? '']}
-          id={`${dataset.id}-selection-highlight-circle`}
-          paint={{
-            'circle-color': '#c98d2b',
-            'circle-radius': 8,
-            'circle-stroke-color': '#fff7e7',
-            'circle-stroke-width': 2,
-          }}
-          type="circle"
-        />
+        {shouldRenderCircleLayer ? (
+          <Layer
+            filter={['==', ['get', 'id'], selection?.featureId ?? '']}
+            id={`${dataset.id}-selection-highlight-circle`}
+            paint={{
+              'circle-color': '#c98d2b',
+              'circle-radius': 8,
+              'circle-stroke-color': '#fff7e7',
+              'circle-stroke-width': 2,
+            }}
+            type="circle"
+          />
+        ) : null}
       </Source>
     )
   }
@@ -599,10 +733,12 @@ export function MapCanvas({
               : baseMapStyle
         }
         onClick={handleMapClick}
+        onLoad={handleMapLoad}
         onMouseLeave={() => setHoveredFeatureId(null)}
         onMouseMove={handleMapMouseMove}
         onMouseDown={handleMapMouseDown}
         onMouseUp={handleMapMouseUp}
+        onStyleData={handleMapStyleData}
         ref={mapRef}
         reuseMaps
       >
@@ -632,7 +768,7 @@ export function MapCanvas({
           />
         </Source>
 
-        {connectorDatasets.map(renderConnectorDataset)}
+        {orderedConnectorDatasets.map(renderConnectorDataset)}
 
         {bboxPreview ? (
           <Source data={bboxPreview} id="bbox-preview" type="geojson">

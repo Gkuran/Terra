@@ -55,6 +55,12 @@
   width: 100%;
 }
 
+.map-view-page__workspace-card > :first-child {
+  display: grid;
+  justify-items: start;
+  gap: 0.35rem;
+}
+
 .map-view-page__layer-panel-stack {
   display: grid;
   gap: 0.75rem;
@@ -63,11 +69,6 @@
 .map-view-page__workspace-card-content {
   display: grid;
   gap: 1rem;
-}
-
-.map-view-page__toolbar-fields {
-  display: grid;
-  gap: 0.85rem;
 }
 
 .map-view-page__session-metrics,

@@ -1,5 +1,4 @@
-import type { ChangeEvent } from 'react'
-import { useId, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import {
   Alert,
@@ -8,8 +7,6 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  FormField,
-  Select,
 } from 'boulder-ui'
 import type { FeatureCollection, Geometry, Polygon } from 'geojson'
 
@@ -28,7 +25,6 @@ import { EnvironmentalPointSamplePanel } from '@/features/environmental-layers/c
 import { requestSoilGridsPointSample } from '@/features/environmental-layers/api/request-soilgrids-point-sample'
 import { useEnvironmentalLayersStore } from '@/features/environmental-layers/stores/use-environmental-layers-store'
 import { FeatureInspectorPanel } from '@/features/feature-inspector/components/feature-inspector-panel'
-import { LayerControlPanel } from '@/features/layers/components/layer-control-panel'
 import type { MapViewScenario } from '@/features/map/api/get-map-view-data'
 import { MapCanvas } from '@/features/map/components/map-canvas'
 import { MapToolbar } from '@/features/map/components/map-toolbar'
@@ -55,26 +51,17 @@ interface MapViewPageProps {
   onScenarioChange: (scenario: MapViewScenario) => void
 }
 
-const scenarioOptions: Array<{ label: string; value: MapViewScenario }> = [
-  { label: 'Operational', value: 'default' },
-  { label: 'Loading', value: 'loading' },
-  { label: 'Empty', value: 'empty' },
-  { label: 'Error', value: 'error' },
-]
-
 export function MapViewPage({
   dataset,
-  datasets,
   features,
   layers,
-  scenario,
   stateMessage,
   uploadHistory,
-  onDatasetChange,
-  onScenarioChange,
+  onDatasetChange: _onDatasetChange,
+  onScenarioChange: _onScenarioChange,
+  datasets: _datasets,
+  scenario: _scenario,
 }: MapViewPageProps) {
-  const datasetFieldId = useId()
-  const scenarioFieldId = useId()
   const selection = useMapUiStore((state) => state.selection)
   const environmentalProbeCoordinates = useMapUiStore(
     (state) => state.environmentalProbeCoordinates,
@@ -271,14 +258,6 @@ export function MapViewPage({
     setEnvironmentalProbeCoordinates(null)
   }
 
-  function handleDatasetChange(event: ChangeEvent<HTMLSelectElement>) {
-    onDatasetChange(event.target.value)
-  }
-
-  function handleScenarioChange(event: ChangeEvent<HTMLSelectElement>) {
-    onScenarioChange(event.target.value as MapViewScenario)
-  }
-
   function handleBoundingBoxComplete(bbox: MapBoundingBox) {
     setBboxSearchError(null)
     bboxSearchMutation.mutate({
@@ -350,53 +329,12 @@ export function MapViewPage({
           {activePanel === 'session' ? (
             <Card className="map-view-page__workspace-card" variant="glass">
               <CardHeader>
-                <CardTitle as="h3">Dataset session</CardTitle>
+                <CardTitle as="h3">Area query</CardTitle>
                 <CardDescription>
-                  Configure the active dataset and preview transport states.
+                  Choose which live sources should be queried when you draw a bounding box on the map.
                 </CardDescription>
               </CardHeader>
               <CardContent className="map-view-page__workspace-card-content">
-                <div className="map-view-page__toolbar-fields">
-                  <FormField id={datasetFieldId} label="Dataset">
-                    <Select
-                      id={datasetFieldId}
-                      onChange={handleDatasetChange}
-                      value={dataset.id}
-                    >
-                      {datasets.map((option) => (
-                        <option key={option.id} value={option.id}>
-                          {option.name}
-                        </option>
-                      ))}
-                    </Select>
-                  </FormField>
-
-                  <FormField id={scenarioFieldId} label="State">
-                    <Select
-                      id={scenarioFieldId}
-                      onChange={handleScenarioChange}
-                      value={scenario}
-                    >
-                      {scenarioOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </Select>
-                  </FormField>
-                </div>
-
-                <div className="map-view-page__session-metrics">
-                  <div className="map-view-page__session-metric">
-                    <span>Region</span>
-                    <strong>{dataset.regionLabel}</strong>
-                  </div>
-                  <div className="map-view-page__session-metric">
-                    <span>Last upload</span>
-                    <strong>{lastUploadResult?.sourceName ?? 'Ready to import'}</strong>
-                  </div>
-                </div>
-
                 <AreaQuerySourcesPanel
                   includeGbif={includeGbifInAreaQuery}
                   includeMacrostrat={includeMacrostratInAreaQuery}
@@ -407,39 +345,23 @@ export function MapViewPage({
                     setIncludeMacrostratInAreaQuery((currentValue) => !currentValue)
                   }
                 />
-
-                {stateMessage ? (
-                  <Alert
-                    heading={`${scenario.charAt(0).toUpperCase()}${scenario.slice(1)} state`}
-                    variant={scenario === 'error' ? 'danger' : 'info'}
-                  >
-                    {stateMessage}
-                  </Alert>
-                ) : null}
-
               </CardContent>
             </Card>
           ) : (
-            <div className="map-view-page__layer-panel-stack">
-              <LayerControlPanel
-                activeDataset={dataset}
-                layers={layers}
-              />
-              <EnvironmentalLayersPanel
-                layers={environmentalLayers}
-                onRemoveLayer={(layerId) => {
-                  removeEnvironmentalLayer(layerId)
+            <EnvironmentalLayersPanel
+              layers={environmentalLayers}
+              onRemoveLayer={(layerId) => {
+                removeEnvironmentalLayer(layerId)
 
-                  if (
-                    environmentalLayers.filter((layer) => layer.id !== layerId).length === 0
-                  ) {
-                    setEnvironmentalProbeCoordinates(null)
-                  }
-                }}
-                onSetLayerOpacity={setEnvironmentalLayerOpacity}
-                onSetLayerVisibility={setEnvironmentalLayerVisibility}
-              />
-            </div>
+                if (
+                  environmentalLayers.filter((layer) => layer.id !== layerId).length === 0
+                ) {
+                  setEnvironmentalProbeCoordinates(null)
+                }
+              }}
+              onSetLayerOpacity={setEnvironmentalLayerOpacity}
+              onSetLayerVisibility={setEnvironmentalLayerVisibility}
+            />
           )}
         </aside>
       ) : null}

@@ -1,11 +1,15 @@
 import { Card, CardContent, CardHeader, CardTitle, Tag } from 'boulder-ui'
+import { LuChevronDown, LuChevronUp } from 'react-icons/lu'
 
 import type { ConnectorDataset } from '@/features/connectors/types/connector-dataset'
+import { AppButton } from '@/shared/ui/app-button/app-button'
 
 import './connector-results-panel.css'
 
 interface ConnectorResultsPanelProps {
   datasets: ConnectorDataset[]
+  isCollapsed: boolean
+  onToggleCollapse: () => void
 }
 
 function buildGroupedSpeciesSummary(dataset: ConnectorDataset) {
@@ -38,14 +42,27 @@ function buildGroupedSpeciesSummary(dataset: ConnectorDataset) {
 
 export function ConnectorResultsPanel({
   datasets,
+  isCollapsed,
+  onToggleCollapse,
 }: ConnectorResultsPanelProps) {
   return (
     <Card className="connector-results-panel" variant="default">
       <CardHeader className="connector-results-panel__header">
         <CardTitle as="h3">Area query results</CardTitle>
+        <AppButton
+          aria-expanded={!isCollapsed}
+          aria-label={isCollapsed ? 'Expand area query results' : 'Collapse area query results'}
+          className="connector-results-panel__collapse-button"
+          onClick={onToggleCollapse}
+          variant="secondary"
+        >
+          {isCollapsed ? <LuChevronDown aria-hidden="true" /> : <LuChevronUp aria-hidden="true" />}
+        </AppButton>
       </CardHeader>
 
-      <CardContent className="connector-results-panel__content">
+      <CardContent
+        className={`connector-results-panel__content${isCollapsed ? ' connector-results-panel__content--collapsed' : ''}`}
+      >
         {datasets.map((dataset) => {
           const groupedSpecies = buildGroupedSpeciesSummary(dataset)
           const floraCount = dataset.collection.features.filter(

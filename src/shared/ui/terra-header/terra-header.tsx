@@ -1,13 +1,18 @@
-import { Header, HeaderBrand, HeaderNav } from "boulder-ui";
+import { Header, HeaderBrand } from "boulder-ui";
+import { LuPlugZap, LuSettings2 } from "react-icons/lu";
 
-import type { DatasetMetadata } from "@/entities/dataset/model/dataset";
+import { AppButton } from "@/shared/ui/app-button/app-button";
 import "./terra-header.css";
 
 interface TerraHeaderProps {
-  activeDataset: DatasetMetadata;
+  onOpenConnectors: () => void;
+  onOpenSettings: () => void;
 }
 
-export function TerraHeader({ activeDataset }: TerraHeaderProps) {
+export function TerraHeader({
+  onOpenConnectors,
+  onOpenSettings,
+}: TerraHeaderProps) {
   return (
     <Header className="terra-header" compact position="fixed" variant="glass">
       <HeaderBrand className="terra-header__brand">
@@ -16,12 +21,26 @@ export function TerraHeader({ activeDataset }: TerraHeaderProps) {
         </div>
       </HeaderBrand>
 
-      <HeaderNav aria-label="Dataset context" className="terra-header__nav">
-        <div className="terra-header__context">
-          <strong>{activeDataset.name}</strong>
-          <span>{activeDataset.regionLabel}</span>
-        </div>
-      </HeaderNav>
+      <div className="terra-header__actions">
+        <AppButton
+          aria-label="Open query settings"
+          className="terra-header__action-button"
+          onClick={onOpenSettings}
+          title="Settings"
+          variant="secondary"
+        >
+          <LuSettings2 aria-hidden="true" />
+        </AppButton>
+        <AppButton
+          aria-label="Open data sources"
+          className="terra-header__action-button"
+          onClick={onOpenConnectors}
+          title="Sources"
+          variant="secondary"
+        >
+          <LuPlugZap aria-hidden="true" />
+        </AppButton>
+      </div>
     </Header>
   );
 }

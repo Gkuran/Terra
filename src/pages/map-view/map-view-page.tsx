@@ -1,13 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import {
-  Alert,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from 'boulder-ui'
 import type { FeatureCollection, Geometry, Polygon } from 'geojson'
 
 import type { DatasetMetadata } from '@/entities/dataset/model/dataset'
@@ -15,7 +7,7 @@ import type { FeatureProperties } from '@/entities/geographic-feature/model/geog
 import { ConnectorLegendPanel } from '@/features/connectors/components/connector-legend-panel'
 import { ConnectorResultsPanel } from '@/features/connectors/components/connector-results-panel'
 import { ConnectorsModal } from '@/features/connectors/components/connectors-modal'
-import { AreaQuerySourcesPanel } from '@/features/connectors/components/area-query-sources-panel'
+import { AreaQuerySettingsModal } from '@/features/connectors/components/area-query-settings-modal'
 import { searchAreaDataByBbox } from '@/features/connectors/bbox/lib/search-area-data-by-bbox'
 import { useConnectorDatasetsStore } from '@/features/connectors/stores/use-connector-datasets-store'
 import type { LayerMetadata } from '@/entities/layer/model/layer-metadata'
@@ -55,7 +47,6 @@ export function MapViewPage({
   dataset,
   features,
   layers,
-  stateMessage,
   uploadHistory,
   onDatasetChange: _onDatasetChange,
   onScenarioChange: _onScenarioChange,
@@ -95,9 +86,12 @@ export function MapViewPage({
   const [focusDatasetId, setFocusDatasetId] = useState<string | null>(null)
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
   const [isConnectorsModalOpen, setIsConnectorsModalOpen] = useState(false)
-  const [activePanel, setActivePanel] = useState<'session' | 'layers' | null>(null)
+  const [isAreaQuerySettingsOpen, setIsAreaQuerySettingsOpen] = useState(false)
+  const [activePanel, setActivePanel] = useState<'layers' | null>(null)
   const [includeGbifInAreaQuery, setIncludeGbifInAreaQuery] = useState(true)
   const [includeMacrostratInAreaQuery, setIncludeMacrostratInAreaQuery] = useState(true)
+  const [isResultsCollapsed, setIsResultsCollapsed] = useState(false)
+  const rightSidebarRef = useRef<HTMLElement | null>(null)
   const visibleEnvironmentalLayers = useMemo(
     () => environmentalLayers.filter((layer) => layer.isVisible),
     [environmentalLayers],
@@ -237,6 +231,17 @@ export function MapViewPage({
     return 'Select at least one source for the area query.'
   }, [includeGbifInAreaQuery, includeMacrostratInAreaQuery])
 
+  useEffect(() => {
+    if (!selectedFeature || !rightSidebarRef.current) {
+      return
+    }
+
+    rightSidebarRef.current.scrollTo({
+      top: 0,
+      behavior: 'smooth',
+    })
+  }, [selectedFeature])
+
   function handleUploadComplete(
     collection: FeatureCollection<Geometry, FeatureProperties>,
     result: UploadResult,
@@ -269,7 +274,10 @@ export function MapViewPage({
 
   return (
     <main className="map-view-page">
-      <TerraHeader activeDataset={dataset} />
+      <TerraHeader
+        onOpenConnectors={() => setIsConnectorsModalOpen(true)}
+        onOpenSettings={() => setIsAreaQuerySettingsOpen(true)}
+      />
 
       <MapCanvas
         connectorDatasets={connectorDatasets}
@@ -284,7 +292,6 @@ export function MapViewPage({
       <div className="map-view-page__dock">
         <MapToolbar
           activePanel={activePanel}
-          onOpenConnectors={() => setIsConnectorsModalOpen(true)}
           onOpenPanel={(panel) =>
             setActivePanel((current) => (current === panel ? null : panel))
           }
@@ -318,36 +325,9 @@ export function MapViewPage({
         </aside>
       ) : null}
 
-      {bboxOccurrenceDatasets.length > 0 ? (
-        <aside className="map-view-page__results">
-          <ConnectorResultsPanel datasets={bboxOccurrenceDatasets} />
-        </aside>
-      ) : null}
-
       {activePanel ? (
         <aside className="map-view-page__panel">
-          {activePanel === 'session' ? (
-            <Card className="map-view-page__workspace-card" variant="glass">
-              <CardHeader>
-                <CardTitle as="h3">Area query</CardTitle>
-                <CardDescription>
-                  Choose which live sources should be queried when you draw a bounding box on the map.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="map-view-page__workspace-card-content">
-                <AreaQuerySourcesPanel
-                  includeGbif={includeGbifInAreaQuery}
-                  includeMacrostrat={includeMacrostratInAreaQuery}
-                  onToggleGbif={() =>
-                    setIncludeGbifInAreaQuery((currentValue) => !currentValue)
-                  }
-                  onToggleMacrostrat={() =>
-                    setIncludeMacrostratInAreaQuery((currentValue) => !currentValue)
-                  }
-                />
-              </CardContent>
-            </Card>
-          ) : (
+          {activePanel === 'layers' ? (
             <EnvironmentalLayersPanel
               layers={environmentalLayers}
               onRemoveLayer={(layerId) => {
@@ -362,13 +342,20 @@ export function MapViewPage({
               onSetLayerOpacity={setEnvironmentalLayerOpacity}
               onSetLayerVisibility={setEnvironmentalLayerVisibility}
             />
-          )}
+          ) : null}
         </aside>
       ) : null}
 
-      {selectedFeature || environmentalLayers.length > 0 ? (
-        <aside className="map-view-page__inspector">
+      {selectedFeature || bboxOccurrenceDatasets.length > 0 || environmentalLayers.length > 0 ? (
+        <aside className="map-view-page__inspector" ref={rightSidebarRef}>
           {selectedFeature ? <FeatureInspectorPanel feature={selectedFeature} /> : null}
+          {bboxOccurrenceDatasets.length > 0 ? (
+            <ConnectorResultsPanel
+              datasets={bboxOccurrenceDatasets}
+              isCollapsed={isResultsCollapsed}
+              onToggleCollapse={() => setIsResultsCollapsed((currentValue) => !currentValue)}
+            />
+          ) : null}
           <EnvironmentalContextPanel layers={environmentalLayers} />
           <EnvironmentalPointSamplePanel
             coordinates={environmentalProbeCoordinates}
@@ -466,6 +453,17 @@ export function MapViewPage({
           setIsConnectorsModalOpen(false)
           setIsUploadModalOpen(true)
         }}
+      />
+
+      <AreaQuerySettingsModal
+        includeGbif={includeGbifInAreaQuery}
+        includeMacrostrat={includeMacrostratInAreaQuery}
+        isOpen={isAreaQuerySettingsOpen}
+        onClose={() => setIsAreaQuerySettingsOpen(false)}
+        onToggleGbif={() => setIncludeGbifInAreaQuery((currentValue) => !currentValue)}
+        onToggleMacrostrat={() =>
+          setIncludeMacrostratInAreaQuery((currentValue) => !currentValue)
+        }
       />
     </main>
   )

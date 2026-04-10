@@ -4,9 +4,7 @@ import {
   LuGalleryVerticalEnd,
   LuHand,
   LuInfo,
-  LuPlugZap,
   LuSquare,
-  LuSlidersHorizontal,
 } from "react-icons/lu";
 
 import { useMapUiStore } from "@/features/map/stores/use-map-ui-store";
@@ -15,14 +13,12 @@ import { AppButton } from "@/shared/ui/app-button/app-button";
 import "./map-toolbar.css";
 
 export interface MapToolbarProps {
-  activePanel: "session" | "layers" | null;
-  onOpenConnectors: () => void;
-  onOpenPanel: (panel: "session" | "layers") => void;
+  activePanel: "layers" | null;
+  onOpenPanel: (panel: "layers") => void;
 }
 
 export function MapToolbar({
   activePanel,
-  onOpenConnectors,
   onOpenPanel,
 }: MapToolbarProps) {
   const activeTool = useMapUiStore((state) => state.activeTool);
@@ -33,16 +29,6 @@ export function MapToolbar({
     <Card className="map-toolbar" variant="glass">
       <CardContent className="map-toolbar__content">
         <AppButton
-          aria-label="Open session panel"
-          aria-pressed={activePanel === "session"}
-          className="map-toolbar__button"
-          onClick={() => onOpenPanel("session")}
-          title="Session"
-          variant={activePanel === "session" ? "primary" : "secondary"}
-        >
-          <LuSlidersHorizontal aria-hidden="true" />
-        </AppButton>
-        <AppButton
           aria-label="Open layers panel"
           aria-pressed={activePanel === "layers"}
           className="map-toolbar__button"
@@ -51,15 +37,6 @@ export function MapToolbar({
           variant={activePanel === "layers" ? "primary" : "secondary"}
         >
           <LuGalleryVerticalEnd aria-hidden="true" />
-        </AppButton>
-        <AppButton
-          aria-label="Open data sources"
-          className="map-toolbar__button"
-          onClick={onOpenConnectors}
-          title="Sources"
-          variant="secondary"
-        >
-          <LuPlugZap aria-hidden="true" />
         </AppButton>
         <AppButton
           aria-label="Enable area selection tool"

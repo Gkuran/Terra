@@ -72,25 +72,6 @@ BGSR currently works as a connector-driven spatial platform built around open sc
 
 Some sources are visible directly in the map workflow, while others support enriched inspection and export behavior behind the scenes.
 
-## Interface Principles
-
-BGSR is designed as a scientific operational interface rather than a generic dashboard.
-
-The experience is organized around a few core ideas:
-
-- the map is the main workspace
-- controls stay close to the spatial workflow
-- context panels explain what is visible instead of competing with the map
-- multiple scientific domains can coexist in the same session without becoming disconnected
-
-This keeps the platform focused on interpretation, not just data retrieval.
-
-## Export-Oriented Thinking
-
-BGSR is intended to be useful both during exploration and after it.
-
-Instead of treating export as a raw download button, the product can generate enriched outputs that reflect the combined spatial context visible in the session. That means biodiversity records can be carried forward with the geological and environmental interpretation that made them meaningful in the first place.
-
 ## Design Foundation
 
 BGSR uses [boulder-ui](https://github.com/Gkuran/boulder-ui) as the design system foundation for its interface layer, helping keep the platform visually consistent, operationally clear, and reusable as the workspace grows.

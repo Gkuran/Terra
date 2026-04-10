@@ -1,0 +1,122 @@
+# BGSR
+
+## Biodiversity and Geoscience Spatial Registry
+
+*Map the living world and the ground beneath it.*
+
+BGSR is a map-first scientific workspace for exploring biodiversity and geoscience in the same spatial context. It brings together fauna, flora, soil, and geological information in a single interface built for regional analysis, field-oriented research, and environmental interpretation.
+
+<p align="center">
+  <em>Product preview placeholder.</em><br />
+  <em>Add a GIF or screenshot here to showcase the main workflow.</em>
+</p>
+
+## Why BGSR
+
+Most spatial tools separate biological records from environmental and geological context. BGSR is designed to connect them.
+
+With BGSR, a single region can be explored through:
+
+- biodiversity occurrences
+- fauna and flora differentiation
+- soil property layers
+- geological unit overlays
+- contextual inspection panels
+- exportable, enriched spatial results
+
+This makes the application useful not only for seeing what exists in a place, but also for understanding the ecological and geological setting around those records.
+
+## What The Product Does
+
+BGSR is centered on an interactive map experience where different scientific sources can be queried, visualized, and compared together.
+
+### Biodiversity Exploration
+
+BGSR can query occurrence data for a selected area and display biological records directly on the map. Results can be separated into fauna and flora, inspected individually, and reviewed in a dedicated side panel.
+
+When source records include richer media, BGSR can surface additional detail such as images and taxonomic context to make inspection more informative and visually useful.
+
+### Soil Context
+
+BGSR integrates soil data through environmental layers that can be turned on, compared, and inspected spatially. This allows users to move beyond biological presence alone and understand the soil conditions associated with a region or observation area.
+
+The result is a workflow where biodiversity and environmental context can be read together instead of in isolation.
+
+### Geological Context
+
+BGSR also adds geological context to the same workspace, allowing users to see regional geology overlays alongside biological and soil information.
+
+This makes it possible to evaluate how geological structure, mapped units, and environmental patterns relate to biodiversity records in the same area of interest.
+
+### Unified Spatial Workflow
+
+The main value of BGSR is not just access to multiple sources, but the ability to work with them simultaneously.
+
+Users can:
+
+- query a region once and compare multiple source types
+- inspect occurrences and contextual layers without leaving the map
+- combine biological, soil, and geological views in the same session
+- export enriched results that preserve cross-source spatial context
+
+## Data Sources
+
+BGSR currently works as a connector-driven spatial product built around open scientific data sources.
+
+| Source | Role in BGSR |
+| --- | --- |
+| [GBIF](https://www.gbif.org/) | Biodiversity occurrences, occurrence detail, and biological inspection workflows |
+| [ISRIC SoilGrids](https://www.isric.org/explore/soilgrids) | Soil property layers, contextual environmental analysis, and point-based sampling |
+| [Macrostrat](https://macrostrat.org/) | Geological units and regional geoscience context |
+
+Some sources are visible directly in the map workflow, while others support enriched inspection and export behavior behind the scenes.
+
+## Interface Principles
+
+BGSR is designed as a scientific operational interface rather than a generic dashboard.
+
+The experience is organized around a few core ideas:
+
+- the map is the main workspace
+- controls stay close to the spatial workflow
+- context panels explain what is visible instead of competing with the map
+- multiple scientific domains can coexist in the same session without becoming disconnected
+
+This keeps the product focused on interpretation, not just data retrieval.
+
+## Export-Oriented Thinking
+
+BGSR is intended to be useful both during exploration and after it.
+
+Instead of treating export as a raw download button, the product can generate enriched outputs that reflect the combined spatial context visible in the session. That means biodiversity records can be carried forward with the geological and environmental interpretation that made them meaningful in the first place.
+
+## Design Foundation
+
+BGSR uses [boulder-ui](https://github.com/Gkuran/boulder-ui) as the design system foundation for its interface layer, helping keep the product visually consistent, operationally clear, and reusable as the workspace grows.
+
+## Current Product Focus
+
+BGSR is currently focused on:
+
+- biodiversity occurrence exploration
+- soil layer visualization
+- regional geology overlays
+- multi-source map inspection
+- enriched data export
+
+The broader direction is to evolve this into a stronger spatial research and fieldwork platform where biological, environmental, and geological evidence can be interpreted together.
+
+## Repository Scope
+
+This repository contains the frontend application for BGSR.
+
+It represents the map experience, interaction model, connector-facing workflows, and scientific inspection interface of the product.
+
+## Media Placeholder
+
+When you are ready, this README is designed to support:
+
+- a hero GIF showing the main map workflow
+- screenshots of biodiversity inspection
+- screenshots of soil and geology overlays
+- examples of combined, multi-source analysis

@@ -1,16 +1,22 @@
 import { Header, HeaderBrand } from "boulder-ui";
-import { LuPlugZap, LuSettings2 } from "react-icons/lu";
+import { LuDownload, LuPlugZap, LuSettings2 } from "react-icons/lu";
 
 import { AppButton } from "@/shared/ui/app-button/app-button";
 import "./terra-header.css";
 
 interface TerraHeaderProps {
+  isExportDisabled?: boolean;
+  isExporting?: boolean;
   onOpenConnectors: () => void;
+  onOpenExport: () => void;
   onOpenSettings: () => void;
 }
 
 export function TerraHeader({
+  isExportDisabled = false,
+  isExporting = false,
   onOpenConnectors,
+  onOpenExport,
   onOpenSettings,
 }: TerraHeaderProps) {
   return (
@@ -22,6 +28,16 @@ export function TerraHeader({
       </HeaderBrand>
 
       <div className="terra-header__actions">
+        <AppButton
+          aria-label="Export enriched occurrences"
+          className="terra-header__action-button"
+          disabled={isExportDisabled || isExporting}
+          onClick={onOpenExport}
+          title="Export"
+          variant="secondary"
+        >
+          <LuDownload aria-hidden="true" />
+        </AppButton>
         <AppButton
           aria-label="Open query settings"
           className="terra-header__action-button"

@@ -16,6 +16,8 @@ const gbifOccurrenceSchema = z.object({
   municipality: z.string().optional(),
   country: z.string().optional(),
   kingdom: z.string().optional(),
+  media: z.array(z.object({ identifier: z.string().optional() })).optional(),
+  mediaType: z.array(z.string()).optional(),
   issues: z.array(z.string()).optional(),
 })
 
@@ -94,6 +96,13 @@ export async function searchGbifOccurrences({
           occurrenceKey: `${occurrence.key}`,
           scientificName: occurrence.scientificName ?? '',
           basisOfRecord: occurrence.basisOfRecord ?? '',
+          hasMedia:
+            occurrence.media && occurrence.media.length > 0
+              ? 'true'
+              : occurrence.mediaType && occurrence.mediaType.length > 0
+                ? 'true'
+                : 'false',
+          mediaCount: `${occurrence.media?.length ?? 0}`,
           institutionCode: occurrence.institutionCode ?? '',
           recordedBy: occurrence.recordedBy ?? '',
           stateProvince: occurrence.stateProvince ?? '',

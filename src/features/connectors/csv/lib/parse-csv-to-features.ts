@@ -9,9 +9,13 @@ import {
 
 const latitudeCandidates = ['latitude', 'lat', 'decimallatitude']
 const longitudeCandidates = ['longitude', 'lon', 'lng', 'decimallongitude']
-const titleCandidates = ['scientificname', 'species', 'name', 'nome', 'taxon']
+const titleCandidates = ['scientificname', 'scientific_name', 'species', 'name', 'nome', 'taxon']
+const categoryCandidates = ['category', 'record_category']
+const observedAtCandidates = ['eventdate', 'observedat', 'observed_at']
+const scientificNameCandidates = ['scientificname', 'scientific_name', 'species']
 
 const csvRowSchema = z.record(z.string(), z.string())
+type CsvFeatureCategory = FeatureProperties['category']
 
 function parseCsvLine(line: string) {
   const values: string[] = []
@@ -98,6 +102,20 @@ export async function parseCsvToFeatures(
     const rawAttributes = stringifyAttributes(row)
     const title =
       readCandidate(row, titleCandidates) ?? `CSV feature ${index + 1}`
+    const categoryCandidate = readCandidate(row, categoryCandidates)
+    const normalizedCategory: CsvFeatureCategory =
+      categoryCandidate === 'flora' ||
+      categoryCandidate === 'fauna' ||
+      categoryCandidate === 'biome' ||
+      categoryCandidate === 'soil' ||
+      categoryCandidate === 'geology' ||
+      categoryCandidate === 'dataset'
+        ? categoryCandidate
+        : 'dataset'
+    const scientificName =
+      readCandidate(row, scientificNameCandidates) ?? undefined
+    const observedAt =
+      readCandidate(row, observedAtCandidates) ?? new Date().toISOString()
 
     return [
       {
@@ -110,17 +128,13 @@ export async function parseCsvToFeatures(
           ...row,
           id: `csv-feature-${index + 1}`,
           title,
-          category: 'dataset' as const,
-          scientificName:
-            row.scientificName ||
-            row.scientificname ||
-            row.species ||
-            undefined,
+          category: normalizedCategory,
+          scientificName,
           biome: row.biome || row.habitat || 'Imported CSV',
           municipality: row.municipality || row.stateProvince || 'Not provided',
           status: 'stable' as const,
           summary: `Imported from ${file.name}.`,
-          observedAt: row.eventDate || new Date().toISOString(),
+          observedAt,
           datasetId: 'csv-connector',
           rawAttributes,
         },

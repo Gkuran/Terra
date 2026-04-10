@@ -74,10 +74,10 @@ export function EnvironmentalLayersPanel({
                 </p>
 
                 <div className="environmental-layers-panel__meta">
-                  <span>{layer.propertyLabel}</span>
-                  <span>{layer.depthLabel}</span>
-                  <span>{layer.statisticLabel}</span>
-                  <span>{layer.unit}</span>
+                  <span>Property: {layer.propertyLabel}</span>
+                  <span>Depth: {layer.depthLabel}</span>
+                  <span>Statistic: {layer.statisticLabel}</span>
+                  <span>Unit: {layer.unit}</span>
                 </div>
 
                 <div className="environmental-layers-panel__legend">

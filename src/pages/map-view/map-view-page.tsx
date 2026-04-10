@@ -10,10 +10,17 @@ import { ConnectorsModal } from '@/features/connectors/components/connectors-mod
 import { AreaQuerySettingsModal } from '@/features/connectors/components/area-query-settings-modal'
 import { searchAreaDataByBbox } from '@/features/connectors/bbox/lib/search-area-data-by-bbox'
 import {
+  buildGbifOccurrenceSummary,
+  defaultGbifOccurrenceFilters,
+  filterConnectorDatasetsByGbifFilters,
+} from '@/features/connectors/lib/gbif-occurrence-filters'
+import { buildEnrichedOccurrencesExport } from '@/features/export/lib/build-enriched-occurrences-export'
+import {
   extractGbifOccurrenceKey,
   requestGbifOccurrenceDetail,
 } from '@/features/connectors/gbif/api/request-gbif-occurrence-detail'
 import { useConnectorDatasetsStore } from '@/features/connectors/stores/use-connector-datasets-store'
+import { requestSoilGridsBatchPointSample } from '@/features/environmental-layers/api/request-soilgrids-batch-point-sample'
 import type { LayerMetadata } from '@/entities/layer/model/layer-metadata'
 import { EnvironmentalContextPanel } from '@/features/environmental-layers/components/environmental-context-panel'
 import { EnvironmentalLayersPanel } from '@/features/environmental-layers/components/environmental-layers-panel'
@@ -58,6 +65,7 @@ export function MapViewPage({
   scenario: _scenario,
 }: MapViewPageProps) {
   const selection = useMapUiStore((state) => state.selection)
+  const setActiveTool = useMapUiStore((state) => state.setActiveTool)
   const environmentalProbeCoordinates = useMapUiStore(
     (state) => state.environmentalProbeCoordinates,
   )
@@ -94,6 +102,9 @@ export function MapViewPage({
   const [activePanel, setActivePanel] = useState<'layers' | null>(null)
   const [includeGbifInAreaQuery, setIncludeGbifInAreaQuery] = useState(true)
   const [includeMacrostratInAreaQuery, setIncludeMacrostratInAreaQuery] = useState(true)
+  const [gbifOccurrenceFilters, setGbifOccurrenceFilters] = useState(
+    defaultGbifOccurrenceFilters,
+  )
   const [isResultsCollapsed, setIsResultsCollapsed] = useState(false)
   const rightSidebarRef = useRef<HTMLElement | null>(null)
   const visibleEnvironmentalLayers = useMemo(
@@ -104,6 +115,7 @@ export function MapViewPage({
     mutationFn: searchAreaDataByBbox,
     onMutate: () => {
       setBboxSearchError(null)
+      setActiveTool('inspect')
     },
     onSuccess: ({ gbif, macrostrat, warnings }) => {
       if (gbif) {
@@ -165,11 +177,15 @@ export function MapViewPage({
         })),
       }),
   })
+  const filteredConnectorDatasets = useMemo(
+    () => filterConnectorDatasetsByGbifFilters(connectorDatasets, gbifOccurrenceFilters),
+    [connectorDatasets, gbifOccurrenceFilters],
+  )
   const selectedFeature = useMemo(
     () => {
       const combinedFeatures = [
         ...features.features,
-        ...connectorDatasets.flatMap((entry) =>
+        ...filteredConnectorDatasets.flatMap((entry) =>
           entry.isVisible ? entry.collection.features : [],
         ),
       ]
@@ -180,7 +196,7 @@ export function MapViewPage({
         ) ?? null
       )
     },
-    [connectorDatasets, features.features, selection?.featureId],
+    [features.features, filteredConnectorDatasets, selection?.featureId],
   )
   const hoveredFeature = useMemo(
     () => {
@@ -190,7 +206,7 @@ export function MapViewPage({
 
       const combinedFeatures = [
         ...features.features,
-        ...connectorDatasets.flatMap((entry) =>
+        ...filteredConnectorDatasets.flatMap((entry) =>
           entry.isVisible ? entry.collection.features : [],
         ),
       ]
@@ -201,7 +217,7 @@ export function MapViewPage({
         ) ?? null
       )
     },
-    [connectorDatasets, features.features, hoveredFeatureId],
+    [features.features, filteredConnectorDatasets, hoveredFeatureId],
   )
   const selectedGbifOccurrenceKey = useMemo(() => {
     if (!selectedFeature?.properties?.id) {
@@ -220,14 +236,34 @@ export function MapViewPage({
     'No hover target'
   const visibleFeatureCount =
     features.features.length +
-    connectorDatasets.reduce(
+    filteredConnectorDatasets.reduce(
       (total, entry) =>
         total + (entry.isVisible ? entry.collection.features.length : 0),
       0,
     )
-  const bboxDatasets = connectorDatasets.filter((dataset) => dataset.context === 'bbox')
+  const bboxDatasets = filteredConnectorDatasets.filter((dataset) => dataset.context === 'bbox')
   const bboxOccurrenceDatasets = bboxDatasets.filter(
     (dataset) => dataset.sourceType === 'gbif',
+  )
+  const hasRawBboxOccurrenceDatasets = connectorDatasets.some(
+    (dataset) => dataset.context === 'bbox' && dataset.sourceType === 'gbif',
+  )
+  const gbifOccurrenceSummary = useMemo(
+    () => buildGbifOccurrenceSummary(connectorDatasets, gbifOccurrenceFilters),
+    [connectorDatasets, gbifOccurrenceFilters],
+  )
+  const availableBasisOfRecord = useMemo(
+    () =>
+      [...new Set(
+        connectorDatasets
+          .filter((dataset) => dataset.sourceType === 'gbif')
+          .flatMap((dataset) =>
+            dataset.collection.features
+              .map((feature) => feature.properties.rawAttributes?.basisOfRecord?.trim() ?? '')
+              .filter((value) => value !== ''),
+          ),
+      )].sort((left, right) => left.localeCompare(right)),
+    [connectorDatasets],
   )
   const areaQueryLoadingLabel = useMemo(() => {
     if (includeGbifInAreaQuery && includeMacrostratInAreaQuery) {
@@ -244,6 +280,75 @@ export function MapViewPage({
 
     return 'Select at least one source for the area query.'
   }, [includeGbifInAreaQuery, includeMacrostratInAreaQuery])
+  const exportMutation = useMutation({
+    mutationFn: async () => {
+      const visibleGbifDatasets = filteredConnectorDatasets.filter(
+        (dataset) => dataset.sourceType === 'gbif' && dataset.isVisible,
+      )
+      const visibleMacrostratDatasets = filteredConnectorDatasets.filter(
+        (dataset) => dataset.sourceType === 'macrostrat' && dataset.isVisible,
+      )
+
+      if (visibleGbifDatasets.length === 0) {
+        throw new Error('No visible GBIF occurrences are available for export.')
+      }
+
+      const visibleOccurrencePoints = visibleGbifDatasets.flatMap((dataset) =>
+        dataset.collection.features
+          .filter(
+            (feature): feature is typeof feature & {
+              geometry: { type: 'Point'; coordinates: [number, number] }
+            } => feature.geometry.type === 'Point',
+          )
+          .map((feature) => ({
+            id: feature.properties.id,
+            lon: feature.geometry.coordinates[0],
+            lat: feature.geometry.coordinates[1],
+          })),
+      )
+
+      const soilSampleItems =
+        visibleEnvironmentalLayers.length > 0 && visibleOccurrencePoints.length > 0
+          ? await requestSoilGridsBatchPointSample({
+              points: visibleOccurrencePoints,
+              layers: visibleEnvironmentalLayers.map((layer) => ({
+                propertyId: layer.propertyId,
+                depthId: layer.depthId,
+                statisticId: layer.statisticId,
+              })),
+            })
+          : []
+
+      const exportPayload = buildEnrichedOccurrencesExport({
+        gbifDatasets: visibleGbifDatasets,
+        macrostratDatasets: visibleMacrostratDatasets,
+        soilSampleItems,
+      })
+
+      if (exportPayload.rowCount === 0) {
+        throw new Error('No visible occurrence rows are available for export.')
+      }
+
+      const blob = new Blob([exportPayload.csv], {
+        type: 'text/csv;charset=utf-8',
+      })
+      const url = URL.createObjectURL(blob)
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+      const anchor = document.createElement('a')
+
+      anchor.href = url
+      anchor.download = `terra-enriched-occurrences-${timestamp}.csv`
+      document.body.append(anchor)
+      anchor.click()
+      anchor.remove()
+      URL.revokeObjectURL(url)
+
+      return exportPayload.rowCount
+    },
+    onError: (error) => {
+      setBboxSearchError(error.message)
+    },
+  })
   const gbifOccurrenceDetailQuery = useQuery({
     enabled: selectedGbifOccurrenceKey !== null,
     queryKey: ['gbif-occurrence-detail', selectedGbifOccurrenceKey ?? 'none'],
@@ -294,12 +399,22 @@ export function MapViewPage({
   return (
     <main className="map-view-page">
       <TerraHeader
+        isExportDisabled={
+          filteredConnectorDatasets.filter(
+            (dataset) => dataset.sourceType === 'gbif' && dataset.isVisible,
+          ).length === 0
+        }
+        isExporting={exportMutation.isPending}
         onOpenConnectors={() => setIsConnectorsModalOpen(true)}
+        onOpenExport={() => {
+          setBboxSearchError(null)
+          exportMutation.mutate()
+        }}
         onOpenSettings={() => setIsAreaQuerySettingsOpen(true)}
       />
 
       <MapCanvas
-        connectorDatasets={connectorDatasets}
+        connectorDatasets={filteredConnectorDatasets}
         environmentalLayers={environmentalLayers}
         focusDatasetId={focusDatasetId}
         features={features}
@@ -365,7 +480,7 @@ export function MapViewPage({
         </aside>
       ) : null}
 
-      {selectedFeature || bboxOccurrenceDatasets.length > 0 || environmentalLayers.length > 0 ? (
+      {selectedFeature || hasRawBboxOccurrenceDatasets || environmentalLayers.length > 0 ? (
         <aside className="map-view-page__inspector" ref={rightSidebarRef}>
           {selectedFeature ? (
             <FeatureInspectorPanel
@@ -379,11 +494,15 @@ export function MapViewPage({
               isGbifDetailLoading={gbifOccurrenceDetailQuery.isLoading}
             />
           ) : null}
-          {bboxOccurrenceDatasets.length > 0 ? (
+          {hasRawBboxOccurrenceDatasets ? (
             <ConnectorResultsPanel
+              availableBasisOfRecord={availableBasisOfRecord}
               datasets={bboxOccurrenceDatasets}
+              filters={gbifOccurrenceFilters}
               isCollapsed={isResultsCollapsed}
+              onFiltersChange={setGbifOccurrenceFilters}
               onToggleCollapse={() => setIsResultsCollapsed((currentValue) => !currentValue)}
+              summary={gbifOccurrenceSummary}
             />
           ) : null}
           <EnvironmentalContextPanel layers={environmentalLayers} />

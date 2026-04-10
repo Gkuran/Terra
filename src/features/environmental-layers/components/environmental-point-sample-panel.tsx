@@ -23,6 +23,10 @@ function formatSampleValue(sample: SoilGridsPointSample) {
   return `${sample.value.toFixed(2)} ${sample.unit}`
 }
 
+function buildSampleLabel(sample: SoilGridsPointSample) {
+  return `${sample.propertyLabel} · ${sample.depthLabel}`
+}
+
 export function EnvironmentalPointSamplePanel({
   coordinates,
   errorMessage,
@@ -69,9 +73,9 @@ export function EnvironmentalPointSamplePanel({
           <ul className="environmental-point-sample-panel__list">
             {samples.map((sample) => (
               <li className="environmental-point-sample-panel__item" key={`${sample.propertyId}-${sample.depthId}-${sample.statisticId}`}>
-                <strong>{sample.propertyLabel}</strong>
-                <span>{sample.depthLabel}</span>
+                <strong>{buildSampleLabel(sample)}</strong>
                 <span>{sample.statisticLabel}</span>
+                <span>{sample.unit}</span>
                 <span>{formatSampleValue(sample)}</span>
               </li>
             ))}

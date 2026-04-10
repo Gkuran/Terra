@@ -35,6 +35,22 @@
   background: rgba(255, 255, 255, 0.64);
 }
 
+.connector-results-panel__summary {
+  display: grid;
+  gap: 0.9rem;
+  padding: 0.9rem;
+  border: 1px solid var(--boulder-color-border);
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.connector-results-panel__summary-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
 .connector-results-panel__dataset-header,
 .connector-results-panel__species-item {
   display: flex;
@@ -56,6 +72,86 @@
   gap: 0.45rem;
 }
 
+.connector-results-panel__filters {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.connector-results-panel__toggle-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.connector-results-panel__filter-button {
+  min-height: 2.2rem;
+}
+
+.connector-results-panel__filter-button--active {
+  border-color: rgba(37, 93, 102, 0.32);
+  background: rgba(223, 239, 236, 0.9);
+}
+
+.connector-results-panel__field-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.connector-results-panel__field {
+  display: grid;
+  gap: 0.32rem;
+}
+
+.connector-results-panel__field span {
+  color: var(--boulder-color-text-secondary);
+  font-size: 0.78rem;
+}
+
+.connector-results-panel__select,
+.connector-results-panel__input {
+  width: 100%;
+  min-height: 2.35rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid rgba(18, 31, 26, 0.12);
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.88);
+  color: inherit;
+  font: inherit;
+}
+
+.connector-results-panel__metric-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.connector-results-panel__metric-block {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.connector-results-panel__simple-list {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.connector-results-panel__simple-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.connector-results-panel__simple-list li span:last-child,
+.connector-results-panel__range {
+  color: var(--boulder-color-text-secondary);
+  font-size: 0.82rem;
+}
+
 .connector-results-panel__species-list {
   display: grid;
   gap: 0.65rem;
@@ -67,4 +163,11 @@
 .connector-results-panel__species-item div {
   display: grid;
   gap: 0.08rem;
+}
+
+@media (max-width: 720px) {
+  .connector-results-panel__field-row,
+  .connector-results-panel__metric-columns {
+    grid-template-columns: 1fr;
+  }
 }

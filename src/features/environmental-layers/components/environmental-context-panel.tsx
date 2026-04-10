@@ -9,7 +9,7 @@ interface EnvironmentalContextPanelProps {
 }
 
 function buildVisibleLayerSummary(layer: EnvironmentalLayer) {
-  return `${layer.propertyLabel} at ${layer.depthLabel} (${layer.statisticLabel})`
+  return `${layer.propertyLabel} at ${layer.depthLabel}`
 }
 
 export function EnvironmentalContextPanel({
@@ -29,9 +29,9 @@ export function EnvironmentalContextPanel({
 
       <CardContent className="environmental-context-panel__content">
         <p className="environmental-context-panel__summary">
-          Soil and environmental surfaces currently visible in the workspace. These
-          layers provide contextual gradients for the same region shown with fauna
-          and flora observations.
+          Soil surfaces currently visible in the workspace. These layers describe
+          environmental context for the same region shown with fauna, flora, and
+          geologic observations.
         </p>
 
         <div className="environmental-context-panel__grid">
@@ -51,6 +51,9 @@ export function EnvironmentalContextPanel({
           {layers.map((layer) => (
             <li className="environmental-context-panel__item" key={layer.id}>
               <strong>{buildVisibleLayerSummary(layer)}</strong>
+              <span>
+                {layer.statisticLabel} · {layer.unit}
+              </span>
               <span>{layer.isVisible ? 'Visible on map' : 'Hidden'}</span>
               <span>{layer.attribution}</span>
             </li>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { GeoJSONSource } from 'maplibre-gl'
 import type {
   Feature,
   FeatureCollection,
@@ -90,6 +91,9 @@ const initialViewState = {
 
 const floraIconId = 'terra-flora-marker'
 const faunaIconId = 'terra-fauna-marker'
+const gbifClusterThreshold = 90
+const gbifClusterMaxZoom = 6
+const gbifClusterRadius = 22
 
 const floraIconMarkup = `
 <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">
@@ -302,6 +306,10 @@ export function MapCanvas({
           ? [
               `${dataset.id}-fill`,
               `${dataset.id}-line`,
+              ...(dataset.sourceType === 'gbif' &&
+              dataset.collection.features.length >= gbifClusterThreshold
+                ? [`${dataset.id}-cluster-circle`]
+                : []),
               ...(dataset.sourceType === 'gbif'
                 ? [`${dataset.id}-symbol`]
                 : dataset.sourceType === 'macrostrat'
@@ -437,6 +445,32 @@ export function MapCanvas({
 
     if (!topFeature || !topFeature.properties) {
       setSelection(null)
+      return
+    }
+
+    if (topFeature.properties.cluster === true) {
+      const clusterId =
+        typeof topFeature.properties.cluster_id === 'number'
+          ? topFeature.properties.cluster_id
+          : null
+
+      if (clusterId !== null && typeof topFeature.source === 'string' && mapRef.current) {
+        const map = mapRef.current.getMap()
+        const source = map.getSource(topFeature.source)
+
+        if (source && 'getClusterExpansionZoom' in source) {
+          void (source as GeoJSONSource)
+            .getClusterExpansionZoom(clusterId)
+            .then((zoom) => {
+              map.easeTo({
+                center: [event.lngLat.lng, event.lngLat.lat],
+                zoom,
+                duration: 450,
+              })
+            })
+        }
+      }
+
       return
     }
 
@@ -579,10 +613,16 @@ export function MapCanvas({
     }
 
     const shouldRenderSymbolLayer = dataset.sourceType === 'gbif'
+    const shouldClusterGbifPoints =
+      dataset.sourceType === 'gbif' &&
+      dataset.collection.features.length >= gbifClusterThreshold
     const shouldRenderCircleLayer = dataset.sourceType !== 'macrostrat'
 
     return (
       <Source
+        cluster={shouldClusterGbifPoints}
+        clusterMaxZoom={shouldClusterGbifPoints ? gbifClusterMaxZoom : undefined}
+        clusterRadius={shouldClusterGbifPoints ? gbifClusterRadius : undefined}
         data={dataset.collection}
         id={dataset.id}
         key={dataset.id}
@@ -590,25 +630,55 @@ export function MapCanvas({
       >
         <Layer
           id={`${dataset.id}-fill`}
+          filter={
+            dataset.sourceType === 'macrostrat'
+              ? ['all', ['!=', ['geometry-type'], 'Point'], ['!=', ['geometry-type'], 'LineString']]
+              : undefined
+          }
           paint={{
             'fill-color': dataset.color,
-            'fill-opacity': 0.22,
+            'fill-opacity': dataset.sourceType === 'macrostrat' ? 0.11 : 0.22,
             'fill-outline-color': dataset.color,
           }}
           type="fill"
         />
         <Layer
           id={`${dataset.id}-line`}
+          filter={shouldClusterGbifPoints ? ['!', ['has', 'point_count']] : undefined}
           paint={{
             'line-color': dataset.color,
-            'line-opacity': 0.92,
-            'line-width': 2.8,
+            'line-opacity': dataset.sourceType === 'macrostrat' ? 0.88 : 0.92,
+            'line-width': dataset.sourceType === 'macrostrat' ? 2.4 : 2.8,
           }}
           type="line"
         />
+        {shouldClusterGbifPoints ? (
+          <Layer
+            filter={['has', 'point_count']}
+            id={`${dataset.id}-cluster-circle`}
+            paint={{
+              'circle-color': 'rgba(255, 248, 239, 0.94)',
+              'circle-radius': [
+                'step',
+                ['get', 'point_count'],
+                13,
+                12,
+                15,
+                30,
+                18,
+                60,
+                21,
+              ],
+              'circle-stroke-color': 'rgba(24, 54, 42, 0.18)',
+              'circle-stroke-width': 1.5,
+            }}
+            type="circle"
+          />
+        ) : null}
         {shouldRenderSymbolLayer && areConnectorIconsReady ? (
           <Layer
             id={`${dataset.id}-symbol`}
+            filter={shouldClusterGbifPoints ? ['!', ['has', 'point_count']] : undefined}
             layout={{
               'icon-allow-overlap': true,
               'icon-ignore-placement': true,

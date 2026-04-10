@@ -4,12 +4,13 @@
 
 *Map the living world and the ground beneath it.*
 
-BGSR is a map-first scientific workspace for exploring biodiversity and geoscience in the same spatial context. It brings together fauna, flora, soil, and geological information in a single interface built for regional analysis, field-oriented research, and environmental interpretation.
+BGSR is an open-source, map-first scientific platform for exploring biodiversity and geoscience in the same spatial context. It brings together fauna, flora, soil, and geological information in a single interface built for regional analysis, field-oriented research, and environmental interpretation.
 
+<!--
 <p align="center">
-  <em>Product preview placeholder.</em><br />
-  <em>Add a GIF or screenshot here to showcase the main workflow.</em>
+  <img src="./docs/media/bgsr-overview.gif" alt="BGSR main workflow" />
 </p>
+-->
 
 ## Why BGSR
 
@@ -26,7 +27,7 @@ With BGSR, a single region can be explored through:
 
 This makes the application useful not only for seeing what exists in a place, but also for understanding the ecological and geological setting around those records.
 
-## What The Product Does
+## What The Platform Does
 
 BGSR is centered on an interactive map experience where different scientific sources can be queried, visualized, and compared together.
 
@@ -61,7 +62,7 @@ Users can:
 
 ## Data Sources
 
-BGSR currently works as a connector-driven spatial product built around open scientific data sources.
+BGSR currently works as a connector-driven spatial platform built around open scientific data sources.
 
 | Source | Role in BGSR |
 | --- | --- |
@@ -82,7 +83,7 @@ The experience is organized around a few core ideas:
 - context panels explain what is visible instead of competing with the map
 - multiple scientific domains can coexist in the same session without becoming disconnected
 
-This keeps the product focused on interpretation, not just data retrieval.
+This keeps the platform focused on interpretation, not just data retrieval.
 
 ## Export-Oriented Thinking
 
@@ -92,9 +93,9 @@ Instead of treating export as a raw download button, the product can generate en
 
 ## Design Foundation
 
-BGSR uses [boulder-ui](https://github.com/Gkuran/boulder-ui) as the design system foundation for its interface layer, helping keep the product visually consistent, operationally clear, and reusable as the workspace grows.
+BGSR uses [boulder-ui](https://github.com/Gkuran/boulder-ui) as the design system foundation for its interface layer, helping keep the platform visually consistent, operationally clear, and reusable as the workspace grows.
 
-## Current Product Focus
+## Current Focus
 
 BGSR is currently focused on:
 
@@ -110,7 +111,7 @@ The broader direction is to evolve this into a stronger spatial research and fie
 
 This repository contains the frontend application for BGSR.
 
-It represents the map experience, interaction model, connector-facing workflows, and scientific inspection interface of the product.
+It represents the map experience, interaction model, connector-facing workflows, and scientific inspection interface of the platform.
 
 ## Media Placeholder
 
@@ -120,3 +121,5 @@ When you are ready, this README is designed to support:
 - screenshots of biodiversity inspection
 - screenshots of soil and geology overlays
 - examples of combined, multi-source analysis
+
+You can replace the commented media block near the top of this README with your final GIF or image paths when those assets are ready.

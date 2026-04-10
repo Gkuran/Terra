@@ -8,6 +8,7 @@ import { ConnectorLegendPanel } from '@/features/connectors/components/connector
 import { ConnectorResultsPanel } from '@/features/connectors/components/connector-results-panel'
 import { ConnectorsModal } from '@/features/connectors/components/connectors-modal'
 import { AreaQuerySettingsModal } from '@/features/connectors/components/area-query-settings-modal'
+import { buildVisibleSessionFeatures } from '@/features/map/lib/build-visible-session-features'
 import { searchAreaDataByBbox } from '@/features/connectors/bbox/lib/search-area-data-by-bbox'
 import {
   buildGbifOccurrenceSummary,
@@ -26,14 +27,15 @@ import { EnvironmentalContextPanel } from '@/features/environmental-layers/compo
 import { EnvironmentalLayersPanel } from '@/features/environmental-layers/components/environmental-layers-panel'
 import { EnvironmentalPointSamplePanel } from '@/features/environmental-layers/components/environmental-point-sample-panel'
 import { requestSoilGridsPointSample } from '@/features/environmental-layers/api/request-soilgrids-point-sample'
+import { mapEnvironmentalLayersToSoilGridsRequest } from '@/features/environmental-layers/lib/map-environmental-layers-to-soilgrids-request'
 import { useEnvironmentalLayersStore } from '@/features/environmental-layers/stores/use-environmental-layers-store'
 import { FeatureInspectorPanel } from '@/features/feature-inspector/components/feature-inspector-panel'
-import type { MapViewScenario } from '@/features/map/api/get-map-view-data'
 import { MapCanvas } from '@/features/map/components/map-canvas'
 import { MapToolbar } from '@/features/map/components/map-toolbar'
 import { useMapUiStore } from '@/features/map/stores/use-map-ui-store'
 import type { MapBoundingBox } from '@/features/map/types/map-bounding-box'
 import { UploadShapefileModal } from '@/features/shapefile-upload/components/upload-shapefile-modal'
+import { createUploadResult } from '@/features/shapefile-upload/lib/create-upload-result'
 import type { UploadResult } from '@/features/shapefile-upload/types/upload-result'
 import { QueryFeedbackBanner } from '@/shared/ui/query-feedback-banner/query-feedback-banner'
 import { StatusBadge } from '@/shared/ui/status-badge/status-badge'
@@ -44,14 +46,9 @@ import './map-view-page.css'
 
 interface MapViewPageProps {
   dataset: DatasetMetadata
-  datasets: DatasetMetadata[]
   features: FeatureCollection<Polygon, FeatureProperties>
   layers: LayerMetadata[]
-  scenario: MapViewScenario
-  stateMessage?: string
   uploadHistory: UploadResult[]
-  onDatasetChange: (datasetId: string) => void
-  onScenarioChange: (scenario: MapViewScenario) => void
 }
 
 export function MapViewPage({
@@ -59,10 +56,6 @@ export function MapViewPage({
   features,
   layers,
   uploadHistory,
-  onDatasetChange: _onDatasetChange,
-  onScenarioChange: _onScenarioChange,
-  datasets: _datasets,
-  scenario: _scenario,
 }: MapViewPageProps) {
   const selection = useMapUiStore((state) => state.selection)
   const setActiveTool = useMapUiStore((state) => state.setActiveTool)
@@ -136,21 +129,22 @@ export function MapViewPage({
         })
       }
 
-      setLastUploadResult({
-        id: `bbox-${Date.now()}`,
-        sourceName: 'Area query',
-        featureCount: (gbif?.resultCount ?? 0) + (macrostrat?.resultCount ?? 0),
-        importedAt: new Date().toISOString(),
-        status: 'success',
-        message:
-          warnings.length > 0
-            ? `Area query completed with warnings: ${warnings.join(' | ')}`
-            : gbif && macrostrat
-              ? 'Fauna, flora, and Macrostrat geology were fetched from the selected area.'
-              : gbif
-                ? 'Fauna and flora occurrences were fetched from the selected area.'
-                : 'Macrostrat geologic units were fetched from the selected area.',
-      })
+      setLastUploadResult(
+        createUploadResult({
+          featureCount: (gbif?.resultCount ?? 0) + (macrostrat?.resultCount ?? 0),
+          idPrefix: 'bbox',
+          message:
+            warnings.length > 0
+              ? `Area query completed with warnings: ${warnings.join(' | ')}`
+              : gbif && macrostrat
+                ? 'Fauna, flora, and Macrostrat geology were fetched from the selected area.'
+                : gbif
+                  ? 'Fauna and flora occurrences were fetched from the selected area.'
+                  : 'Macrostrat geologic units were fetched from the selected area.',
+          sourceName: 'Area query',
+          status: 'success',
+        }),
+      )
     },
     onError: (error) => {
       setBboxSearchError(error.message)
@@ -170,54 +164,32 @@ export function MapViewPage({
       requestSoilGridsPointSample({
         lon: environmentalProbeCoordinates?.[0] ?? 0,
         lat: environmentalProbeCoordinates?.[1] ?? 0,
-        layers: visibleEnvironmentalLayers.map((layer) => ({
-          propertyId: layer.propertyId,
-          depthId: layer.depthId,
-          statisticId: layer.statisticId,
-        })),
+        layers: mapEnvironmentalLayersToSoilGridsRequest(visibleEnvironmentalLayers),
       }),
   })
   const filteredConnectorDatasets = useMemo(
     () => filterConnectorDatasetsByGbifFilters(connectorDatasets, gbifOccurrenceFilters),
     [connectorDatasets, gbifOccurrenceFilters],
   )
+  const visibleSessionFeatures = useMemo(
+    () => buildVisibleSessionFeatures(features, filteredConnectorDatasets),
+    [features, filteredConnectorDatasets],
+  )
   const selectedFeature = useMemo(
-    () => {
-      const combinedFeatures = [
-        ...features.features,
-        ...filteredConnectorDatasets.flatMap((entry) =>
-          entry.isVisible ? entry.collection.features : [],
-        ),
-      ]
-
-      return (
-        combinedFeatures.find(
-          (feature) => feature.properties.id === selection?.featureId,
-        ) ?? null
-      )
-    },
-    [features.features, filteredConnectorDatasets, selection?.featureId],
+    () =>
+      visibleSessionFeatures.find(
+        (feature) => feature.properties.id === selection?.featureId,
+      ) ?? null,
+    [selection?.featureId, visibleSessionFeatures],
   )
   const hoveredFeature = useMemo(
-    () => {
-      if (!hoveredFeatureId) {
-        return null
-      }
-
-      const combinedFeatures = [
-        ...features.features,
-        ...filteredConnectorDatasets.flatMap((entry) =>
-          entry.isVisible ? entry.collection.features : [],
-        ),
-      ]
-
-      return (
-        combinedFeatures.find(
-          (feature) => feature.properties.id === hoveredFeatureId,
-        ) ?? null
-      )
-    },
-    [features.features, filteredConnectorDatasets, hoveredFeatureId],
+    () =>
+      hoveredFeatureId
+        ? visibleSessionFeatures.find(
+            (feature) => feature.properties.id === hoveredFeatureId,
+          ) ?? null
+        : null,
+    [hoveredFeatureId, visibleSessionFeatures],
   )
   const selectedGbifOccurrenceKey = useMemo(() => {
     if (!selectedFeature?.properties?.id) {
@@ -234,13 +206,7 @@ export function MapViewPage({
     hoveredFeature?.properties.title ??
     hoveredFeatureId ??
     'No hover target'
-  const visibleFeatureCount =
-    features.features.length +
-    filteredConnectorDatasets.reduce(
-      (total, entry) =>
-        total + (entry.isVisible ? entry.collection.features.length : 0),
-      0,
-    )
+  const visibleFeatureCount = visibleSessionFeatures.length
   const bboxDatasets = filteredConnectorDatasets.filter((dataset) => dataset.context === 'bbox')
   const bboxOccurrenceDatasets = bboxDatasets.filter(
     (dataset) => dataset.sourceType === 'gbif',
@@ -311,11 +277,7 @@ export function MapViewPage({
         visibleEnvironmentalLayers.length > 0 && visibleOccurrencePoints.length > 0
           ? await requestSoilGridsBatchPointSample({
               points: visibleOccurrencePoints,
-              layers: visibleEnvironmentalLayers.map((layer) => ({
-                propertyId: layer.propertyId,
-                depthId: layer.depthId,
-                statisticId: layer.statisticId,
-              })),
+              layers: mapEnvironmentalLayersToSoilGridsRequest(visibleEnvironmentalLayers),
             })
           : []
 
@@ -565,14 +527,15 @@ export function MapViewPage({
             label: sourceName,
             sourceType: 'gbif',
           })
-          setLastUploadResult({
-            id: `gbif-${Date.now()}`,
-            sourceName,
-            featureCount: collection.features.length,
-            importedAt: new Date().toISOString(),
-            status: 'success',
-            message: 'Occurrences were fetched live from GBIF.',
-          })
+          setLastUploadResult(
+            createUploadResult({
+              featureCount: collection.features.length,
+              idPrefix: 'gbif',
+              message: 'Occurrences were fetched live from GBIF.',
+              sourceName,
+              status: 'success',
+            }),
+          )
           setIsConnectorsModalOpen(false)
         }}
         onAddEnvironmentalLayer={(layer) => {
@@ -588,14 +551,15 @@ export function MapViewPage({
             label: sourceName,
             sourceType: 'csv',
           })
-          setLastUploadResult({
-            id: `csv-${Date.now()}`,
-            sourceName,
-            featureCount: collection.features.length,
-            importedAt: new Date().toISOString(),
-            status: 'success',
-            message: 'Scientific records were imported from CSV.',
-          })
+          setLastUploadResult(
+            createUploadResult({
+              featureCount: collection.features.length,
+              idPrefix: 'csv',
+              message: 'Scientific records were imported from CSV.',
+              sourceName,
+              status: 'success',
+            }),
+          )
           setIsConnectorsModalOpen(false)
         }}
         onOpenShapefileImport={() => {

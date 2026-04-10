@@ -32,36 +32,14 @@ function buildFallbackDataset(
 
 function IndexRouteComponent() {
   const search = indexRoute.useSearch()
-  const navigate = indexRoute.useNavigate()
   const query = useMapViewQuery(search.scenario, search.datasetId)
-
-  const handleDatasetChange = (datasetId: string) =>
-    navigate({
-      search: {
-        ...search,
-        datasetId,
-      },
-    })
-
-  const handleScenarioChange = (scenario: MapViewScenario) =>
-    navigate({
-      search: {
-        ...search,
-        scenario,
-      },
-    })
 
   if (query.isPending) {
     return (
       <MapViewPage
         dataset={buildFallbackDataset('loading')}
-        datasets={[]}
         features={{ type: 'FeatureCollection', features: [] }}
         layers={[]}
-        onDatasetChange={handleDatasetChange}
-        onScenarioChange={handleScenarioChange}
-        scenario={search.scenario}
-        stateMessage="Simulating remote dataset preparation for the current operational view."
         uploadHistory={[]}
       />
     )
@@ -71,13 +49,8 @@ function IndexRouteComponent() {
     return (
       <MapViewPage
         dataset={buildFallbackDataset('error', query.error.message)}
-        datasets={[]}
         features={{ type: 'FeatureCollection', features: [] }}
         layers={[]}
-        onDatasetChange={handleDatasetChange}
-        onScenarioChange={handleScenarioChange}
-        scenario={search.scenario}
-        stateMessage={query.error.message}
         uploadHistory={[]}
       />
     )
@@ -95,17 +68,8 @@ function IndexRouteComponent() {
   return (
     <MapViewPage
       dataset={activeDataset}
-      datasets={data.datasets}
       features={data.features}
       layers={data.layers}
-      onDatasetChange={handleDatasetChange}
-      onScenarioChange={handleScenarioChange}
-      scenario={search.scenario}
-      stateMessage={
-        search.scenario === 'empty'
-          ? 'This scenario intentionally clears overlays so the empty-state workflow can be reviewed.'
-          : undefined
-      }
       uploadHistory={data.uploadHistory}
     />
   )

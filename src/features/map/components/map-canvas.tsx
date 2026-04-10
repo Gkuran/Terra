@@ -1,12 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { GeoJSONSource } from 'maplibre-gl'
-import type {
-  Feature,
-  FeatureCollection,
-  GeoJsonProperties,
-  Geometry,
-  Position,
-} from 'geojson'
+import type { Feature, FeatureCollection, GeoJsonProperties, Geometry } from 'geojson'
 import Map, {
   Layer,
   type MapLayerMouseEvent,
@@ -19,13 +13,21 @@ import Map, {
   type StyleSpecification,
 } from 'react-map-gl/maplibre'
 
+import type { FeatureProperties } from '@/entities/geographic-feature/model/geographic-feature'
 import type { LayerMetadata } from '@/entities/layer/model/layer-metadata'
+import {
+  connectorFaunaMarkerSvgMarkup,
+  connectorFloraMarkerSvgMarkup,
+} from '@/features/connectors/lib/connector-marker-icons'
 import type { ConnectorDataset } from '@/features/connectors/types/connector-dataset'
 import type { EnvironmentalLayer } from '@/features/environmental-layers/types/environmental-layer'
 import { useLayerPresentationStore } from '@/features/layers/stores/use-layer-presentation-store'
+import { buildVisibleSessionFeatures } from '@/features/map/lib/build-visible-session-features'
+import { getFeatureCollectionBounds } from '@/features/map/lib/get-feature-collection-bounds'
 import { useMapUiStore } from '@/features/map/stores/use-map-ui-store'
 import type { MapBoundingBox } from '@/features/map/types/map-bounding-box'
 import { env } from '@/shared/config/env'
+
 import './map-canvas.css'
 
 const baseMapStyle: StyleSpecification = {
@@ -95,32 +97,12 @@ const gbifClusterThreshold = 90
 const gbifClusterMaxZoom = 6
 const gbifClusterRadius = 22
 
-const floraIconMarkup = `
-<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">
-  <circle cx="14" cy="14" r="11.4" fill="rgba(255,255,255,0.94)" stroke="rgba(18,31,26,0.12)" stroke-width="1.2"/>
-  <path d="M14 22c-.8 0-1.4-.6-1.4-1.4v-3.4c0-2.3 1.1-4.3 2.9-5.5-3.7.3-6.6-1.4-8.4-5C9.7 4.5 12.5 3.9 15.3 4.7c1.9.6 3.3 1.8 4.1 3.7 2-1.6 4-1.7 6.1-.3-.9 4.8-3.7 7.4-8.3 7.7-2 .2-3.2 1.3-3.2 3.2v1.6c0 .8-.6 1.4-1.4 1.4Z" fill="#4f7d4c"/>
-  <path d="M14 18.5c-.2 0-.4-.1-.6-.2a.95.95 0 0 1-.1-1.3l5.4-6.1c.3-.4.9-.4 1.3-.1.4.3.4.9.1 1.3l-5.4 6.1c-.2.2-.4.3-.7.3Z" fill="#eff7e9"/>
-</svg>
-`
-
-const faunaIconMarkup = `
-<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">
-  <circle cx="14" cy="14" r="11.4" fill="rgba(255,255,255,0.94)" stroke="rgba(18,31,26,0.12)" stroke-width="1.2"/>
-  <circle cx="9.1" cy="9.1" r="2.4" fill="#8a5a36"/>
-  <circle cx="18.9" cy="9.1" r="2.4" fill="#8a5a36"/>
-  <circle cx="6.9" cy="14" r="1.95" fill="#8a5a36"/>
-  <circle cx="21.1" cy="14" r="1.95" fill="#8a5a36"/>
-  <path d="M14 21.6c3.4 0 6.1-2.1 6.1-4.9 0-3-2.7-5.7-6.1-5.7s-6.1 2.7-6.1 5.7c0 2.8 2.7 4.9 6.1 4.9Z" fill="#8a5a36"/>
-  <path d="M11.8 17.1c0 1 1 1.7 2.2 1.7s2.2-.7 2.2-1.7" fill="none" stroke="#fff7e7" stroke-width="1.5" stroke-linecap="round"/>
-</svg>
-`
-
 function buildIconDataUrl(svgMarkup: string) {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgMarkup)}`
 }
 
 interface MapCanvasProps {
-  features: FeatureCollection<Geometry, GeoJsonProperties>
+  features: FeatureCollection<Geometry, FeatureProperties>
   layers: LayerMetadata[]
   connectorDatasets: ConnectorDataset[]
   environmentalLayers: EnvironmentalLayer[]
@@ -132,73 +114,6 @@ interface MapCanvasProps {
 interface BoundingBoxDraft {
   current: [number, number]
   start: [number, number]
-}
-
-function visitCoordinates(
-  coordinates: Position | Position[] | Position[][] | Position[][][],
-  onPosition: (position: Position) => void,
-) {
-  if (!Array.isArray(coordinates[0])) {
-    onPosition(coordinates as Position)
-    return
-  }
-
-  for (const coordinate of coordinates as Array<
-    Position | Position[] | Position[][]
-  >) {
-    visitCoordinates(
-      coordinate as Position | Position[] | Position[][] | Position[][][],
-      onPosition,
-    )
-  }
-}
-
-function getFeatureCollectionBounds(
-  collection: FeatureCollection<Geometry, GeoJsonProperties>,
-) {
-  let minLongitude = Infinity
-  let minLatitude = Infinity
-  let maxLongitude = -Infinity
-  let maxLatitude = -Infinity
-
-  function collectGeometryBounds(geometry: Geometry) {
-    if (geometry.type === 'GeometryCollection') {
-      for (const nestedGeometry of geometry.geometries) {
-        collectGeometryBounds(nestedGeometry)
-      }
-
-      return
-    }
-
-    visitCoordinates(geometry.coordinates as never, ([longitude, latitude]) => {
-      minLongitude = Math.min(minLongitude, longitude)
-      minLatitude = Math.min(minLatitude, latitude)
-      maxLongitude = Math.max(maxLongitude, longitude)
-      maxLatitude = Math.max(maxLatitude, latitude)
-    })
-  }
-
-  for (const feature of collection.features) {
-    if (!feature.geometry) {
-      continue
-    }
-
-    collectGeometryBounds(feature.geometry)
-  }
-
-  if (
-    !Number.isFinite(minLongitude) ||
-    !Number.isFinite(minLatitude) ||
-    !Number.isFinite(maxLongitude) ||
-    !Number.isFinite(maxLatitude)
-  ) {
-    return null
-  }
-
-  return [
-    [minLongitude, minLatitude],
-    [maxLongitude, maxLatitude],
-  ] as [[number, number], [number, number]]
 }
 
 function buildInteractiveLayerIds(layers: LayerMetadata[]) {
@@ -255,8 +170,8 @@ export function MapCanvas({
     }
 
     await Promise.all([
-      loadIcon(floraIconId, floraIconMarkup),
-      loadIcon(faunaIconId, faunaIconMarkup),
+      loadIcon(floraIconId, connectorFloraMarkerSvgMarkup),
+      loadIcon(faunaIconId, connectorFaunaMarkerSvgMarkup),
     ])
 
     setAreConnectorIconsReady(true)
@@ -285,12 +200,7 @@ export function MapCanvas({
 
   const selectedFeature = useMemo(
     () =>
-      [
-        ...features.features,
-        ...connectorDatasets.flatMap((dataset) =>
-          dataset.isVisible ? dataset.collection.features : [],
-        ),
-      ].find(
+      buildVisibleSessionFeatures(features, connectorDatasets).find(
         (feature) =>
           'id' in (feature.properties ?? {}) &&
           feature.properties?.id === selection?.featureId,
@@ -526,7 +436,7 @@ export function MapCanvas({
 
     setSelection(null)
     setHoveredFeatureId(null)
-      setBboxDraft({
+    setBboxDraft({
       start: [event.lngLat.lng, event.lngLat.lat],
       current: [event.lngLat.lng, event.lngLat.lat],
     })
@@ -793,7 +703,9 @@ export function MapCanvas({
   return (
     <section className="map-canvas" aria-label="Terra map canvas">
       <Map
-        cursor={activeTool === 'bbox' ? 'crosshair' : activeTool === 'inspect' ? 'crosshair' : 'grab'}
+        cursor={
+          activeTool === 'bbox' || activeTool === 'inspect' ? 'crosshair' : 'grab'
+        }
         dragPan={activeTool !== 'bbox'}
         initialViewState={initialViewState}
         interactiveLayerIds={interactiveLayerIds}
@@ -880,7 +792,6 @@ export function MapCanvas({
           </Popup>
         ) : null}
       </Map>
-
     </section>
   )
 }

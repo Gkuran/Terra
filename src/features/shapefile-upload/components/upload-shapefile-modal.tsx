@@ -12,6 +12,7 @@ import {
 import type { FeatureCollection, Geometry } from 'geojson'
 
 import type { FeatureProperties } from '@/entities/geographic-feature/model/geographic-feature'
+import { createUploadResult } from '@/features/shapefile-upload/lib/create-upload-result'
 import { normalizeUploadedFeatures } from '@/features/shapefile-upload/lib/normalize-uploaded-features'
 import { parseShapefileArchive } from '@/features/shapefile-upload/lib/parse-shapefile'
 import type { UploadResult } from '@/features/shapefile-upload/types/upload-result'
@@ -57,29 +58,29 @@ export function UploadShapefileModal({
     try {
       const collection = await parseShapefileArchive(await file.arrayBuffer())
       const normalizedCollection = normalizeUploadedFeatures(collection, file.name)
-      const result: UploadResult = {
-        id: `upload-${Date.now()}`,
-        sourceName: file.name,
+      const result = createUploadResult({
         featureCount: normalizedCollection.features.length,
-        importedAt: new Date().toISOString(),
-        status: 'success',
+        idPrefix: 'upload',
         message: 'Archive parsed locally and ready for overlay review.',
-      }
+        sourceName: file.name,
+        status: 'success',
+      })
 
       setFeedback(result)
       onUploadComplete(normalizedCollection, result)
     } catch (error) {
-      setFeedback({
-        id: `upload-${Date.now()}`,
-        sourceName: file.name,
-        featureCount: 0,
-        importedAt: new Date().toISOString(),
-        status: 'error',
-        message:
-          error instanceof Error
-            ? error.message
-            : 'The selected archive could not be processed.',
-      })
+      setFeedback(
+        createUploadResult({
+          featureCount: 0,
+          idPrefix: 'upload',
+          message:
+            error instanceof Error
+              ? error.message
+              : 'The selected archive could not be processed.',
+          sourceName: file.name,
+          status: 'error',
+        }),
+      )
     } finally {
       setIsUploading(false)
       event.target.value = ''

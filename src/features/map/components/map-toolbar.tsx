@@ -1,70 +1,64 @@
-import { Card, CardContent, CardHeader, CardTitle } from "boulder-ui";
-import {
-  LuEraser,
-  LuGalleryVerticalEnd,
-  LuHand,
-  LuInfo,
-  LuSquare,
-} from "react-icons/lu";
+import { Card, CardContent } from 'boulder-ui'
+import { LuEraser, LuGalleryVerticalEnd, LuHand, LuInfo, LuSquare } from 'react-icons/lu'
 
-import { useMapUiStore } from "@/features/map/stores/use-map-ui-store";
-import { AppButton } from "@/shared/ui/app-button/app-button";
+import { useMapUiStore } from '@/features/map/stores/use-map-ui-store'
+import { AppButton } from '@/shared/ui/app-button/app-button'
 
-import "./map-toolbar.css";
+import './map-toolbar.css'
 
 export interface MapToolbarProps {
-  activePanel: "layers" | null;
-  onOpenPanel: (panel: "layers") => void;
+  activePanel: 'layers' | null
+  onOpenPanel: (panel: 'layers') => void
 }
 
 export function MapToolbar({
   activePanel,
   onOpenPanel,
 }: MapToolbarProps) {
-  const activeTool = useMapUiStore((state) => state.activeTool);
-  const setActiveTool = useMapUiStore((state) => state.setActiveTool);
-  const setSelection = useMapUiStore((state) => state.setSelection);
+  const activeTool = useMapUiStore((state) => state.activeTool)
+  const setActiveTool = useMapUiStore((state) => state.setActiveTool)
+  const setSelection = useMapUiStore((state) => state.setSelection)
 
   return (
     <Card className="map-toolbar" variant="glass">
       <CardContent className="map-toolbar__content">
         <AppButton
           aria-label="Open layers panel"
-          aria-pressed={activePanel === "layers"}
+          aria-pressed={activePanel === 'layers'}
           className="map-toolbar__button"
-          onClick={() => onOpenPanel("layers")}
+          onClick={() => onOpenPanel('layers')}
           title="Layers"
-          variant={activePanel === "layers" ? "primary" : "secondary"}
+          variant={activePanel === 'layers' ? 'primary' : 'secondary'}
         >
           <LuGalleryVerticalEnd aria-hidden="true" />
         </AppButton>
         <AppButton
           aria-label="Enable area selection tool"
-          aria-pressed={activeTool === "bbox"}
+          aria-pressed={activeTool === 'bbox'}
           className="map-toolbar__button"
-          onClick={() => setActiveTool("bbox")}
+          onClick={() => setActiveTool('bbox')}
           title="Area selection"
-          variant={activeTool === "bbox" ? "primary" : "secondary"}
+          variant={activeTool === 'bbox' ? 'primary' : 'secondary'}
         >
           <LuSquare aria-hidden="true" />
         </AppButton>
         <AppButton
           aria-label="Enable inspect tool"
-          aria-pressed={activeTool === "inspect"}
+          aria-pressed={activeTool === 'inspect'}
           className="map-toolbar__button"
-          onClick={() => setActiveTool("inspect")}
+          onClick={() => setActiveTool('inspect')}
           title="Inspect"
-          variant={activeTool === "inspect" ? "primary" : "secondary"}
+          variant={activeTool === 'inspect' ? 'primary' : 'secondary'}
         >
           <LuInfo aria-hidden="true" />
         </AppButton>
         <AppButton
           aria-label="Enable pan tool"
-          aria-pressed={activeTool === "pan"}
+          aria-pressed={activeTool === 'pan'}
           className="map-toolbar__button"
-          onClick={() => setActiveTool("pan")}
+          onClick={() => setActiveTool('pan')}
           title="Pan"
-          variant={activeTool === "pan" ? "primary" : "secondary"}
+          variant={activeTool === 'pan' ? 'primary' : 'secondary'}
         >
           <LuHand aria-hidden="true" />
         </AppButton>
@@ -79,5 +73,5 @@ export function MapToolbar({
         </AppButton>
       </CardContent>
     </Card>
-  );
+  )
 }

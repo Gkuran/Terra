@@ -1,29 +1,43 @@
-import type { FeatureCollection, Point } from 'geojson'
+import type { FeatureCollection, Geometry } from 'geojson'
 import { z } from 'zod'
 
 import type { FeatureProperties } from '@/entities/geographic-feature/model/geographic-feature'
+import { env } from '@/shared/config/env'
 
-const gbifOccurrenceSchema = z.object({
-  key: z.number(),
-  scientificName: z.string().optional(),
-  decimalLatitude: z.number(),
-  decimalLongitude: z.number(),
-  eventDate: z.string().optional(),
-  basisOfRecord: z.string().optional(),
-  institutionCode: z.string().optional(),
-  recordedBy: z.string().optional(),
-  stateProvince: z.string().optional(),
-  municipality: z.string().optional(),
-  country: z.string().optional(),
-  kingdom: z.string().optional(),
-  media: z.array(z.object({ identifier: z.string().optional() })).optional(),
-  mediaType: z.array(z.string()).optional(),
-  issues: z.array(z.string()).optional(),
+const backendFeaturePropertiesSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  category: z.enum(['dataset', 'flora', 'fauna']),
+  scientificName: z.string().nullable().optional(),
+  biome: z.string(),
+  municipality: z.string(),
+  status: z.literal('stable'),
+  summary: z.string(),
+  observedAt: z.string(),
+  datasetId: z.string(),
+  rawAttributes: z.record(z.string(), z.string()).default({}),
 })
 
-const gbifResponseSchema = z.object({
-  results: z.array(gbifOccurrenceSchema),
-  count: z.number(),
+const backendFeatureSchema = z.object({
+  type: z.literal('Feature'),
+  geometry: z.object({
+    type: z.literal('Point'),
+    coordinates: z.tuple([z.number(), z.number()]),
+  }),
+  properties: backendFeaturePropertiesSchema,
+})
+
+const gbifFilteredSearchResponseSchema = z.object({
+  metadata: z.object({
+    source: z.literal('GBIF'),
+    search_mode: z.literal('filters'),
+    result_count: z.number(),
+    query_label: z.string(),
+  }),
+  feature_collection: z.object({
+    type: z.literal('FeatureCollection'),
+    features: z.array(backendFeatureSchema),
+  }),
 })
 
 export interface GbifConnectorInput {
@@ -38,80 +52,39 @@ export async function searchGbifOccurrences({
   country,
   stateProvince,
   limit = 200,
-}: GbifConnectorInput): Promise<FeatureCollection<Point, FeatureProperties>> {
-  const searchParams = new URLSearchParams({
-    scientificName,
-    country,
-    hasCoordinate: 'true',
-    limit: `${limit}`,
-  })
-
-  if (stateProvince) {
-    searchParams.set('stateProvince', stateProvince)
+}: GbifConnectorInput): Promise<FeatureCollection<Geometry, FeatureProperties>> {
+  if (!env.VITE_API_BASE_URL) {
+    throw new Error('VITE_API_BASE_URL is not configured for GBIF connector queries.')
   }
 
-  const response = await fetch(
-    `https://api.gbif.org/v1/occurrence/search?${searchParams.toString()}`,
-  )
+  const response = await fetch(`${env.VITE_API_BASE_URL}/api/v1/occurrences/search`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      scientificName,
+      country,
+      stateProvince,
+      limit,
+    }),
+  })
 
   if (!response.ok) {
-    throw new Error('GBIF request failed. Try adjusting the species or region filters.')
+    const errorPayload = await response.json().catch(() => null)
+    const detail =
+      errorPayload &&
+      typeof errorPayload === 'object' &&
+      'detail' in errorPayload &&
+      typeof errorPayload.detail === 'string'
+        ? errorPayload.detail
+        : 'GBIF request failed. Try adjusting the species or region filters.'
+
+    throw new Error(detail)
   }
 
   const json = await response.json()
-  const parsed = gbifResponseSchema.parse(json)
+  const parsed = gbifFilteredSearchResponseSchema.parse(json)
 
-  if (parsed.results.length === 0) {
-    throw new Error('GBIF returned no georeferenced occurrences for the selected filters.')
-  }
-
-  return {
-    type: 'FeatureCollection',
-    features: parsed.results.map((occurrence, index) => ({
-      type: 'Feature',
-      geometry: {
-        type: 'Point',
-        coordinates: [occurrence.decimalLongitude, occurrence.decimalLatitude],
-      },
-      properties: {
-        id: `gbif-occurrence-${occurrence.key}`,
-        title: occurrence.scientificName ?? `GBIF occurrence ${index + 1}`,
-        category:
-          occurrence.kingdom === 'Plantae'
-            ? 'flora'
-            : occurrence.kingdom === 'Animalia'
-              ? 'fauna'
-              : 'dataset',
-        scientificName: occurrence.scientificName,
-        biome: occurrence.country ?? 'GBIF',
-        municipality:
-          occurrence.municipality ??
-          occurrence.stateProvince ??
-          'Not provided',
-        status: 'stable',
-        summary: `Imported from GBIF occurrence ${occurrence.key}.`,
-        observedAt: occurrence.eventDate ?? new Date().toISOString(),
-        datasetId: 'gbif-connector',
-        rawAttributes: {
-          occurrenceKey: `${occurrence.key}`,
-          scientificName: occurrence.scientificName ?? '',
-          basisOfRecord: occurrence.basisOfRecord ?? '',
-          hasMedia:
-            occurrence.media && occurrence.media.length > 0
-              ? 'true'
-              : occurrence.mediaType && occurrence.mediaType.length > 0
-                ? 'true'
-                : 'false',
-          mediaCount: `${occurrence.media?.length ?? 0}`,
-          institutionCode: occurrence.institutionCode ?? '',
-          recordedBy: occurrence.recordedBy ?? '',
-          stateProvince: occurrence.stateProvince ?? '',
-          municipality: occurrence.municipality ?? '',
-          country: occurrence.country ?? '',
-          kingdom: occurrence.kingdom ?? '',
-          issues: occurrence.issues?.join(', ') ?? '',
-        },
-      },
-    })),
-  }
+  return parsed.feature_collection as FeatureCollection<Geometry, FeatureProperties>
 }

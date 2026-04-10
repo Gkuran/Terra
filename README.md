@@ -2,7 +2,7 @@
 
 ## Biodiversity and Geoscience Spatial Registry
 
-*Map the living world and the ground beneath it.*
+_Map the living world and the ground beneath it._
 
 BGSR is an open-source, map-first scientific platform for exploring biodiversity and geoscience in the same spatial context. It brings together fauna, flora, soil, and geological information in a single interface built for regional analysis, field-oriented research, and environmental interpretation.
 
@@ -64,11 +64,11 @@ Users can:
 
 BGSR currently works as a connector-driven spatial platform built around open scientific data sources.
 
-| Source | Role in BGSR |
-| --- | --- |
-| [GBIF](https://www.gbif.org/) | Biodiversity occurrences, occurrence detail, and biological inspection workflows |
+| Source                                                     | Role in BGSR                                                                      |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| [GBIF](https://www.gbif.org/)                              | Biodiversity occurrences, occurrence detail, and biological inspection workflows  |
 | [ISRIC SoilGrids](https://www.isric.org/explore/soilgrids) | Soil property layers, contextual environmental analysis, and point-based sampling |
-| [Macrostrat](https://macrostrat.org/) | Geological units and regional geoscience context |
+| [Macrostrat](https://macrostrat.org/)                      | Geological units and regional geoscience context                                  |
 
 Some sources are visible directly in the map workflow, while others support enriched inspection and export behavior behind the scenes.
 
@@ -112,14 +112,3 @@ The broader direction is to evolve this into a stronger spatial research and fie
 This repository contains the frontend application for BGSR.
 
 It represents the map experience, interaction model, connector-facing workflows, and scientific inspection interface of the platform.
-
-## Media Placeholder
-
-When you are ready, this README is designed to support:
-
-- a hero GIF showing the main map workflow
-- screenshots of biodiversity inspection
-- screenshots of soil and geology overlays
-- examples of combined, multi-source analysis
-
-You can replace the commented media block near the top of this README with your final GIF or image paths when those assets are ready.

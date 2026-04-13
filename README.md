@@ -12,34 +12,6 @@ BGSR is an open-source, map-first scientific platform for exploring biodiversity
 </p>
 -->
 
-## Visual Overview
-
-The current interface is built around a map-first workflow where biodiversity records, geological context, and environmental layers can be explored in the same session.
-
-### Example 1: Area Query With Biodiversity Records
-
-This example shows a bounding box selection followed by occurrence plotting on the map. BGSR can return fauna and flora records together, keeping them directly visible in the spatial context where the query was made.
-
-![BGSR area query with biodiversity records](./docs/assets/example1.png)
-
-### Example 2: Occurrence Inspection
-
-Each plotted occurrence can be inspected individually. The inspector emphasizes the scientific identity of the record and, when available from the source, also surfaces media such as observation images for faster interpretation.
-
-![BGSR occurrence inspector with scientific name and image](./docs/assets/example2.png)
-
-### Example 3: Geological Overlay From Macrostrat
-
-BGSR can also render geological information from Macrostrat in the same workspace. In this example, an alluvial deposit unit is displayed as a spatial geology layer, helping connect biodiversity observations with mapped geological structure.
-
-![BGSR geological overlay from Macrostrat](./docs/assets/example3.png)
-
-### Example 4: Environmental Layer Visualization
-
-Environmental layers can be explored at broader regional scales. This example shows a large-scale view over southern Brazil and neighboring areas with a SoilGrids pH(H2O) layer enabled, illustrating how BGSR supports environmental interpretation beyond single occurrences.
-
-![BGSR environmental pH layer over southern Brazil](./docs/assets/example4.png)
-
 ## Why BGSR
 
 Most spatial tools separate biological records from environmental and geological context. BGSR is designed to connect them.
@@ -63,7 +35,19 @@ BGSR is centered on an interactive map experience where different scientific sou
 
 BGSR can query occurrence data for a selected area and display biological records directly on the map. Results can be separated into fauna and flora, inspected individually, and reviewed in a dedicated side panel.
 
+#### Area Query With Biodiversity Records
+
+Bounding box selection can be used to query a region and immediately populate the map with fauna and flora occurrences in their original spatial context.
+
+![BGSR area query with biodiversity records](./docs/assets/example1.png)
+
 When source records include richer media, BGSR can surface additional detail such as images and taxonomic context to make inspection more informative and visually useful.
+
+#### Occurrence Inspection
+
+Individual records can be opened in the inspector, where the scientific name, media, and occurrence metadata are presented as a focused inspection workflow rather than a raw attribute dump.
+
+![BGSR occurrence inspector with scientific name and image](./docs/assets/example2.png)
 
 ### Soil Context
 
@@ -71,11 +55,23 @@ BGSR integrates soil data through environmental layers that can be turned on, co
 
 The result is a workflow where biodiversity and environmental context can be read together instead of in isolation.
 
+#### Regional Environmental Layer Visualization
+
+Environmental layers remain useful not only for local inspection but also for broader regional interpretation. Large-scale views can be used to examine spatial gradients such as SoilGrids pH(H2O) across southern Brazil and neighboring areas.
+
+![BGSR environmental pH layer over southern Brazil](./docs/assets/example4.png)
+
 ### Geological Context
 
 BGSR also adds geological context to the same workspace, allowing users to see regional geology overlays alongside biological and soil information.
 
 This makes it possible to evaluate how geological structure, mapped units, and environmental patterns relate to biodiversity records in the same area of interest.
+
+#### Geological Overlay From Macrostrat
+
+Geological units from Macrostrat can be rendered directly in the map workspace. This allows mapped deposits, lithologic context, and regional structure to be compared with biodiversity and soil layers in the same visual frame.
+
+![BGSR geological overlay from Macrostrat](./docs/assets/example3.png)
 
 ### Unified Spatial Workflow
 

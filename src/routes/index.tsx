@@ -11,6 +11,15 @@ import { parseWithSchema } from '@/shared/lib/zod/parse-with-schema'
 const searchSchema = z.object({
   datasetId: z.string().optional(),
   scenario: z.enum(['default', 'loading', 'empty', 'error']).catch('default'),
+  sharedOccurrenceKey: z.preprocess((value) => {
+    if (value === undefined || value === null || value === '') {
+      return undefined
+    }
+
+    const numericValue = Number(value)
+
+    return Number.isInteger(numericValue) && numericValue > 0 ? numericValue : value
+  }, z.number().int().positive().optional()),
 })
 
 function buildFallbackDataset(
@@ -70,6 +79,7 @@ function IndexRouteComponent() {
       dataset={activeDataset}
       features={data.features}
       layers={data.layers}
+      sharedOccurrenceKey={search.sharedOccurrenceKey ?? null}
       uploadHistory={data.uploadHistory}
     />
   )

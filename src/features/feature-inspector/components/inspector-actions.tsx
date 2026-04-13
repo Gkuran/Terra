@@ -5,6 +5,8 @@ import { LuCopy, LuExternalLink, LuLocateFixed } from 'react-icons/lu'
 
 import type { FeatureProperties } from '@/entities/geographic-feature/model/geographic-feature'
 import type { GbifOccurrenceDetail } from '@/features/connectors/gbif/api/request-gbif-occurrence-detail'
+import { extractGbifOccurrenceKey } from '@/features/connectors/gbif/api/request-gbif-occurrence-detail'
+import { buildSharedOccurrenceLink } from '@/features/connectors/gbif/lib/build-shared-occurrence-link'
 import { formatFeatureCoordinates } from '@/features/feature-inspector/lib/feature-inspector-geometry'
 import { AppButton } from '@/shared/ui/app-button/app-button'
 
@@ -45,14 +47,24 @@ export function InspectorActions({
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null)
   const coordinatesLabel = formatFeatureCoordinates(feature)
   const externalReference = getExternalReference(feature, gbifDetail)
+  const occurrenceKey = extractGbifOccurrenceKey(
+    feature.properties.id,
+    feature.properties.rawAttributes,
+  )
 
   async function handleCopyCoordinates() {
-    if (!coordinatesLabel) {
-      setCopyFeedback('Coordinates unavailable')
-      return
-    }
-
     try {
+      if (occurrenceKey !== null) {
+        await navigator.clipboard.writeText(buildSharedOccurrenceLink(occurrenceKey))
+        setCopyFeedback('Share link copied')
+        return
+      }
+
+      if (!coordinatesLabel) {
+        setCopyFeedback('Coordinates unavailable')
+        return
+      }
+
       await navigator.clipboard.writeText(coordinatesLabel)
       setCopyFeedback('Coordinates copied')
     } catch {
@@ -72,10 +84,10 @@ export function InspectorActions({
         <LuLocateFixed aria-hidden="true" />
       </AppButton>
       <AppButton
-        aria-label={copyFeedback ?? 'Copy feature coordinates'}
+        aria-label={copyFeedback ?? (occurrenceKey !== null ? 'Copy share link' : 'Copy feature coordinates')}
         className="feature-inspector-panel__action-button"
         onClick={handleCopyCoordinates}
-        title={copyFeedback ?? 'Copy coordinates'}
+        title={copyFeedback ?? (occurrenceKey !== null ? 'Copy share link' : 'Copy coordinates')}
         variant="secondary"
       >
         <LuCopy aria-hidden="true" />

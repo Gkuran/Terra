@@ -12,6 +12,28 @@ import type { ConnectorQueryHistoryEntry } from '@/features/connectors/types/con
 
 const maxRecentConnectorQueries = 8
 
+const safeLocalStorageStateStorage = {
+  getItem: (name: string) => window.localStorage.getItem(name),
+  removeItem: (name: string) => window.localStorage.removeItem(name),
+  setItem: (name: string, value: string) => {
+    try {
+      window.localStorage.setItem(name, value)
+    } catch (error) {
+      if (
+        error instanceof DOMException &&
+        (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED')
+      ) {
+        console.warn(
+          `Skipping persisted connector dataset write for "${name}" because localStorage quota was exceeded.`,
+        )
+        return
+      }
+
+      throw error
+    }
+  },
+}
+
 function normalizePersistedQueryParams(
   queryParams: Record<string, string | number | boolean | null>,
 ) {
@@ -187,7 +209,6 @@ const connectorDatasetSchema = z.object({
 })
 
 const persistedConnectorDatasetsStateSchema = z.object({
-  datasets: z.array(connectorDatasetSchema),
   recentQueries: z
     .array(
       z.object({
@@ -297,10 +318,9 @@ export const useConnectorDatasetsStore = create<ConnectorDatasetsState>()(
     {
       name: 'terra-connector-datasets',
       partialize: (state) => ({
-        datasets: state.datasets,
         recentQueries: state.recentQueries,
       }),
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => safeLocalStorageStateStorage),
       merge: (persistedState, currentState) => {
         const parsed = persistedConnectorDatasetsStateSchema.safeParse(
           (persistedState as StorageValue<unknown> | undefined)?.state,
@@ -312,9 +332,6 @@ export const useConnectorDatasetsStore = create<ConnectorDatasetsState>()(
 
         return {
           ...currentState,
-          datasets: parsed.data.datasets.map((dataset) =>
-            normalizePersistedConnectorDataset(dataset),
-          ),
           recentQueries:
             parsed.data.recentQueries?.map((entry) =>
               normalizePersistedRecentQuery(entry),

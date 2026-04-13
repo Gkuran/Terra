@@ -29,6 +29,7 @@ import {
   extractGbifOccurrenceKey,
   requestGbifOccurrenceDetail,
 } from '@/features/connectors/gbif/api/request-gbif-occurrence-detail'
+import { buildSharedGbifOccurrenceDataset } from '@/features/connectors/gbif/lib/build-shared-gbif-occurrence-dataset'
 import { useConnectorDatasetsStore } from '@/features/connectors/stores/use-connector-datasets-store'
 import { requestSoilGridsBatchPointSample } from '@/features/environmental-layers/api/request-soilgrids-batch-point-sample'
 import { requestResilientSoilGridsSamples } from '@/features/environmental-layers/api/request-resilient-soilgrids-samples'
@@ -71,6 +72,7 @@ interface MapViewPageProps {
   dataset: DatasetMetadata
   features: FeatureCollection<Geometry, FeatureProperties>
   layers: LayerMetadata[]
+  sharedOccurrenceKey?: number | null
   uploadHistory: UploadResult[]
 }
 
@@ -96,6 +98,7 @@ export function MapViewPage({
   dataset,
   features,
   layers,
+  sharedOccurrenceKey = null,
   uploadHistory,
 }: MapViewPageProps) {
   const selection = useMapUiStore((state) => state.selection)
@@ -220,12 +223,24 @@ export function MapViewPage({
   const [hoveredClimbingLabel, setHoveredClimbingLabel] = useState<string | null>(null)
   const rightSidebarRef = useRef<HTMLElement | null>(null)
   const lastClimbingErrorRef = useRef<string | null>(null)
+  const lastSharedOccurrenceErrorRef = useRef<string | null>(null)
+  const lastAppliedSharedOccurrenceKeyRef = useRef<number | null>(null)
+  const isSharedOccurrenceMode = sharedOccurrenceKey !== null
   const visibleEnvironmentalLayers = useMemo(
     () => environmentalLayers.filter((layer) => layer.isVisible),
     [environmentalLayers],
   )
 
   useEffect(() => {
+    if (isSharedOccurrenceMode) {
+      setSessionDataset(dataset)
+      setSessionFeatures({ type: 'FeatureCollection', features: [] })
+      setSessionLayers(layers)
+      setSessionUploadHistory([])
+      setHasRestoredLocalSnapshot(true)
+      return
+    }
+
     if (!hasWorkspaceHydrated || hasRestoredLocalSnapshot) {
       return
     }
@@ -262,12 +277,17 @@ export function MapViewPage({
     hasRestoredLocalSnapshot,
     hasWorkspaceHydrated,
     initializeFromRoute,
+    isSharedOccurrenceMode,
     layers,
+    setSessionDataset,
+    setSessionFeatures,
+    setSessionLayers,
+    setSessionUploadHistory,
     uploadHistory,
   ])
 
   useEffect(() => {
-    if (hasSeenTour) {
+    if (hasSeenTour || isSharedOccurrenceMode) {
       return
     }
 
@@ -277,7 +297,7 @@ export function MapViewPage({
     }, 550)
 
     return () => window.clearTimeout(timer)
-  }, [hasSeenTour, markTourSeen, startTour])
+  }, [hasSeenTour, isSharedOccurrenceMode, markTourSeen, startTour])
 
   const bboxSearchMutation = useMutation({
     mutationFn: searchAreaDataByBbox,
@@ -700,10 +720,17 @@ export function MapViewPage({
     environmentalLayers.length > 0 ||
     (sessionFeatures?.features.length ?? 0) > 0
   const isWorkspaceEmpty =
+    !isSharedOccurrenceMode &&
     connectorDatasets.length === 0 &&
     environmentalLayers.length === 0 &&
     (sessionFeatures?.features.length ?? 0) === 0 &&
     !isStartCardDismissed
+
+  const sharedOccurrenceDetailQuery = useQuery({
+    enabled: isSharedOccurrenceMode,
+    queryKey: ['shared-gbif-occurrence-detail', sharedOccurrenceKey ?? 'none'],
+    queryFn: () => requestGbifOccurrenceDetail(sharedOccurrenceKey ?? 0),
+  })
 
   function handleImportSession(
     fileName: string,
@@ -831,7 +858,98 @@ export function MapViewPage({
   }
 
   useEffect(() => {
+    const errorMessage =
+      sharedOccurrenceDetailQuery.error instanceof Error
+        ? sharedOccurrenceDetailQuery.error.message
+        : null
+
+    if (!errorMessage || lastSharedOccurrenceErrorRef.current === errorMessage) {
+      return
+    }
+
+    lastSharedOccurrenceErrorRef.current = errorMessage
+    setBboxSearchError(errorMessage)
+    pushToast({
+      description: errorMessage,
+      title: 'Shared occurrence failed',
+      variant: 'danger',
+    })
+  }, [pushToast, sharedOccurrenceDetailQuery.error])
+
+  useEffect(() => {
+    if (!isSharedOccurrenceMode || !sharedOccurrenceDetailQuery.data || !sessionDataset) {
+      return
+    }
+
+    if (lastAppliedSharedOccurrenceKeyRef.current === sharedOccurrenceKey) {
+      return
+    }
+
+    const sharedDataset = buildSharedGbifOccurrenceDataset(sharedOccurrenceDetailQuery.data)
+
+    if (!sharedDataset) {
+      setBboxSearchError('Shared occurrence coordinates are unavailable.')
+      pushToast({
+        description: 'The shared occurrence does not contain valid coordinates.',
+        title: 'Shared occurrence failed',
+        variant: 'danger',
+      })
+      lastAppliedSharedOccurrenceKeyRef.current = sharedOccurrenceKey
+      return
+    }
+
+    const sharedFeature = sharedDataset.collection.features[0]
+    const sharedCoordinates = getFeatureFocusCoordinates(sharedFeature)
+
+    setBboxSearchError(null)
+    setFocusDatasetId(null)
+    setFocusFeatureCollection(sharedDataset.collection)
+    setHoveredFeatureId(null)
+    setEnvironmentalProbeCoordinates(null)
+    setSelection(
+      sharedCoordinates
+        ? {
+            featureId: sharedFeature.properties.id,
+            layerId: sharedFeature.properties.datasetId,
+            coordinates: sharedCoordinates,
+          }
+        : null,
+    )
+    if (sharedCoordinates) {
+      setFocusCoordinates(sharedCoordinates)
+    }
+    replaceConnectorDatasets([sharedDataset])
+    replaceRecentQueries([])
+    replaceEnvironmentalLayers([])
+    setSessionFeatures({ type: 'FeatureCollection', features: [] })
+    setSessionLayers(layers)
+    setSessionUploadHistory([])
+    lastAppliedSharedOccurrenceKeyRef.current = sharedOccurrenceKey
+  }, [
+    isSharedOccurrenceMode,
+    layers,
+    pushToast,
+    replaceConnectorDatasets,
+    replaceEnvironmentalLayers,
+    replaceRecentQueries,
+    sessionDataset,
+    setEnvironmentalProbeCoordinates,
+    setFocusCoordinates,
+    setHoveredFeatureId,
+    setSelection,
+    setSessionFeatures,
+    setSessionLayers,
+    setSessionUploadHistory,
+    sharedOccurrenceDetailQuery.data,
+    sharedOccurrenceKey,
+  ])
+
+  useEffect(() => {
     if (!hasRestoredLocalSnapshot || !sessionDataset) {
+      return
+    }
+
+    if (isSharedOccurrenceMode) {
       return
     }
 
@@ -868,6 +986,7 @@ export function MapViewPage({
     hoveredFeatureId,
     includeGbifInAreaQuery,
     includeMacrostratInAreaQuery,
+    isSharedOccurrenceMode,
     isClimbingModeEnabled,
     isResultsCollapsed,
     layerOpacityById,
@@ -919,7 +1038,9 @@ export function MapViewPage({
     setIsExportModalOpen(false)
   }
   const gbifOccurrenceDetailQuery = useQuery({
-    enabled: selectedGbifOccurrenceKey !== null,
+    enabled:
+      selectedGbifOccurrenceKey !== null &&
+      selectedGbifOccurrenceKey !== sharedOccurrenceKey,
     queryKey: ['gbif-occurrence-detail', selectedGbifOccurrenceKey ?? 'none'],
     queryFn: () => requestGbifOccurrenceDetail(selectedGbifOccurrenceKey ?? 0),
   })
@@ -1076,15 +1197,30 @@ export function MapViewPage({
               baseDataset={sessionDataset ?? dataset}
               connectorProvenance={selectedConnectorDataset?.provenance ?? null}
               feature={selectedFeature}
-              gbifDetail={gbifOccurrenceDetailQuery.data ?? null}
-              gbifDetailError={
-                gbifOccurrenceDetailQuery.error instanceof Error
-                  ? gbifOccurrenceDetailQuery.error.message
-                  : null
+              gbifDetail={
+                selectedGbifOccurrenceKey !== null &&
+                selectedGbifOccurrenceKey === sharedOccurrenceKey
+                  ? sharedOccurrenceDetailQuery.data ?? null
+                  : gbifOccurrenceDetailQuery.data ?? null
               }
-              isGbifDetailLoading={gbifOccurrenceDetailQuery.isLoading}
+              gbifDetailError={
+                selectedGbifOccurrenceKey !== null &&
+                selectedGbifOccurrenceKey === sharedOccurrenceKey
+                  ? sharedOccurrenceDetailQuery.error instanceof Error
+                    ? sharedOccurrenceDetailQuery.error.message
+                    : null
+                  : gbifOccurrenceDetailQuery.error instanceof Error
+                    ? gbifOccurrenceDetailQuery.error.message
+                    : null
+              }
+              isGbifDetailLoading={
+                selectedGbifOccurrenceKey !== null &&
+                selectedGbifOccurrenceKey === sharedOccurrenceKey
+                  ? sharedOccurrenceDetailQuery.isLoading
+                  : gbifOccurrenceDetailQuery.isLoading
+              }
               navigation={
-                selectedNavigationContext
+                selectedNavigationContext && selectedNavigationContext.total > 1
                   ? {
                       currentIndex: selectedNavigationContext.currentIndex,
                       total: selectedNavigationContext.total,

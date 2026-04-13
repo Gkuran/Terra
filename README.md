@@ -12,6 +12,34 @@ BGSR is an open-source, map-first scientific platform for exploring biodiversity
 </p>
 -->
 
+## Visual Overview
+
+The current interface is built around a map-first workflow where biodiversity records, geological context, and environmental layers can be explored in the same session.
+
+### Example 1: Area Query With Biodiversity Records
+
+This example shows a bounding box selection followed by occurrence plotting on the map. BGSR can return fauna and flora records together, keeping them directly visible in the spatial context where the query was made.
+
+![BGSR area query with biodiversity records](./docs/assets/example1.png)
+
+### Example 2: Occurrence Inspection
+
+Each plotted occurrence can be inspected individually. The inspector emphasizes the scientific identity of the record and, when available from the source, also surfaces media such as observation images for faster interpretation.
+
+![BGSR occurrence inspector with scientific name and image](./docs/assets/example2.png)
+
+### Example 3: Geological Overlay From Macrostrat
+
+BGSR can also render geological information from Macrostrat in the same workspace. In this example, an alluvial deposit unit is displayed as a spatial geology layer, helping connect biodiversity observations with mapped geological structure.
+
+![BGSR geological overlay from Macrostrat](./docs/assets/example3.png)
+
+### Example 4: Environmental Layer Visualization
+
+Environmental layers can be explored at broader regional scales. This example shows a large-scale view over southern Brazil and neighboring areas with a SoilGrids pH(H2O) layer enabled, illustrating how BGSR supports environmental interpretation beyond single occurrences.
+
+![BGSR environmental pH layer over southern Brazil](./docs/assets/example4.png)
+
 ## Why BGSR
 
 Most spatial tools separate biological records from environmental and geological context. BGSR is designed to connect them.

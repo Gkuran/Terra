@@ -18,6 +18,7 @@ import {
 import { buildEnrichedOccurrencesExport } from '@/features/export/lib/build-enriched-occurrences-export'
 import { buildBgsrSessionExport } from '@/features/export/lib/build-bgsr-session-export'
 import { ExportSessionModal } from '@/features/export/components/export-session-modal'
+import { CsvExportFeedbackBanner } from '@/features/export/components/csv-export-feedback-banner'
 import type { BgsrSessionImport } from '@/features/export/lib/bgsr-session-schema'
 import { downloadExportFile } from '@/features/export/lib/download-export-file'
 import { OnboardingTour } from '@/features/onboarding/components/onboarding-tour'
@@ -29,6 +30,7 @@ import {
 } from '@/features/connectors/gbif/api/request-gbif-occurrence-detail'
 import { useConnectorDatasetsStore } from '@/features/connectors/stores/use-connector-datasets-store'
 import { requestSoilGridsBatchPointSample } from '@/features/environmental-layers/api/request-soilgrids-batch-point-sample'
+import { requestResilientSoilGridsSamples } from '@/features/environmental-layers/api/request-resilient-soilgrids-samples'
 import type { LayerMetadata } from '@/entities/layer/model/layer-metadata'
 import type { ConnectorDataset } from '@/features/connectors/types/connector-dataset'
 import { EnvironmentalContextPanel } from '@/features/environmental-layers/components/environmental-context-panel'
@@ -49,9 +51,17 @@ import { UploadShapefileModal } from '@/features/shapefile-upload/components/upl
 import { createUploadResult } from '@/features/shapefile-upload/lib/create-upload-result'
 import type { UploadResult } from '@/features/shapefile-upload/types/upload-result'
 import { QueryFeedbackBanner } from '@/shared/ui/query-feedback-banner/query-feedback-banner'
+import { useToastStore } from '@/shared/ui/app-toast'
 import { StatusBadge } from '@/shared/ui/status-badge/status-badge'
 import { TerraFooter } from '@/shared/ui/terra-footer/terra-footer'
 import { TerraHeader } from '@/shared/ui/terra-header/terra-header'
+import { WorkspaceStartCard } from '@/shared/ui/workspace-start-card/workspace-start-card'
+import { useWorkspaceSessionStore } from '@/features/workspace-session/stores/use-workspace-session-store'
+import {
+  readLocalWorkspaceSnapshot,
+  removeLocalWorkspaceSnapshot,
+  writeLocalWorkspaceSnapshot,
+} from '@/features/workspace-session/lib/local-workspace-snapshot'
 
 import './map-view-page.css'
 
@@ -69,6 +79,15 @@ function buildBboxQueryParams(bbox: MapBoundingBox): Record<string, string> {
     maxLng: bbox.maxLng.toFixed(6),
     maxLat: bbox.maxLat.toFixed(6),
   }
+}
+
+function mergeUniqueById<T extends { id: string }>(currentItems: T[], incomingItems: T[]) {
+  const mergedItems = new Map<string, T>()
+
+  currentItems.forEach((item) => mergedItems.set(item.id, item))
+  incomingItems.forEach((item) => mergedItems.set(item.id, item))
+
+  return [...mergedItems.values()]
 }
 
 export function MapViewPage({
@@ -120,34 +139,75 @@ export function MapViewPage({
   const replaceLayerPresentation = useLayerPresentationStore(
     (state) => state.replacePresentation,
   )
+  const resetLayerPresentation = useLayerPresentationStore((state) => state.resetPresentation)
   const currentTourStepIndex = useOnboardingStore((state) => state.currentStepIndex)
+  const hasSeenTour = useOnboardingStore((state) => state.hasSeenTour)
   const closeTour = useOnboardingStore((state) => state.closeTour)
   const completeTour = useOnboardingStore((state) => state.completeTour)
   const goToNextTourStep = useOnboardingStore((state) => state.goToNextStep)
   const goToPreviousTourStep = useOnboardingStore((state) => state.goToPreviousStep)
   const isTourOpen = useOnboardingStore((state) => state.isOpen)
+  const markTourSeen = useOnboardingStore((state) => state.markTourSeen)
   const startTour = useOnboardingStore((state) => state.startTour)
-  const [sessionDataset, setSessionDataset] = useState(dataset)
-  const [sessionFeatures, setSessionFeatures] = useState(features)
-  const [sessionLayers, setSessionLayers] = useState(layers)
-  const [sessionUploadHistory, setSessionUploadHistory] = useState(uploadHistory)
+  const pushToast = useToastStore((state) => state.pushToast)
+  const activePanel = useWorkspaceSessionStore((state) => state.activePanel)
+  const dismissStartCard = useWorkspaceSessionStore((state) => state.dismissStartCard)
+  const gbifOccurrenceFilters = useWorkspaceSessionStore(
+    (state) => state.gbifOccurrenceFilters,
+  )
+  const hasWorkspaceHydrated = useWorkspaceSessionStore((state) => state.hasHydrated)
+  const includeGbifInAreaQuery = useWorkspaceSessionStore(
+    (state) => state.includeGbifInAreaQuery,
+  )
+  const includeMacrostratInAreaQuery = useWorkspaceSessionStore(
+    (state) => state.includeMacrostratInAreaQuery,
+  )
+  const initializeFromRoute = useWorkspaceSessionStore(
+    (state) => state.initializeFromRoute,
+  )
+  const isResultsCollapsed = useWorkspaceSessionStore(
+    (state) => state.isResultsCollapsed,
+  )
+  const isStartCardDismissed = useWorkspaceSessionStore(
+    (state) => state.isStartCardDismissed,
+  )
+  const sessionDataset = useWorkspaceSessionStore((state) => state.sessionDataset)
+  const sessionFeatures = useWorkspaceSessionStore((state) => state.sessionFeatures)
+  const sessionLayers = useWorkspaceSessionStore((state) => state.sessionLayers)
+  const sessionUploadHistory = useWorkspaceSessionStore(
+    (state) => state.sessionUploadHistory,
+  )
+  const setActivePanel = useWorkspaceSessionStore((state) => state.setActivePanel)
+  const setGbifOccurrenceFilters = useWorkspaceSessionStore(
+    (state) => state.setGbifOccurrenceFilters,
+  )
+  const setIncludeGbifInAreaQuery = useWorkspaceSessionStore(
+    (state) => state.setIncludeGbifInAreaQuery,
+  )
+  const setIncludeMacrostratInAreaQuery = useWorkspaceSessionStore(
+    (state) => state.setIncludeMacrostratInAreaQuery,
+  )
+  const setIsResultsCollapsed = useWorkspaceSessionStore(
+    (state) => state.setIsResultsCollapsed,
+  )
+  const setSessionDataset = useWorkspaceSessionStore((state) => state.setSessionDataset)
+  const setSessionFeatures = useWorkspaceSessionStore((state) => state.setSessionFeatures)
+  const setSessionLayers = useWorkspaceSessionStore((state) => state.setSessionLayers)
+  const setSessionUploadHistory = useWorkspaceSessionStore(
+    (state) => state.setSessionUploadHistory,
+  )
   const [lastUploadResult, setLastUploadResult] = useState<UploadResult | null>(null)
   const [bboxSearchError, setBboxSearchError] = useState<string | null>(null)
+  const [hasRestoredLocalSnapshot, setHasRestoredLocalSnapshot] = useState(false)
   const [focusDatasetId, setFocusDatasetId] = useState<string | null>(null)
   const [focusFeatureCollection, setFocusFeatureCollection] = useState<
     FeatureCollection<Geometry, FeatureProperties> | null
   >(null)
   const [isExportModalOpen, setIsExportModalOpen] = useState(false)
+  const [csvExportStepLabel, setCsvExportStepLabel] = useState('Preparing CSV export.')
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
   const [isConnectorsModalOpen, setIsConnectorsModalOpen] = useState(false)
   const [isAreaQuerySettingsOpen, setIsAreaQuerySettingsOpen] = useState(false)
-  const [activePanel, setActivePanel] = useState<'layers' | null>(null)
-  const [includeGbifInAreaQuery, setIncludeGbifInAreaQuery] = useState(true)
-  const [includeMacrostratInAreaQuery, setIncludeMacrostratInAreaQuery] = useState(true)
-  const [gbifOccurrenceFilters, setGbifOccurrenceFilters] = useState(
-    defaultGbifOccurrenceFilters,
-  )
-  const [isResultsCollapsed, setIsResultsCollapsed] = useState(true)
   const rightSidebarRef = useRef<HTMLElement | null>(null)
   const visibleEnvironmentalLayers = useMemo(
     () => environmentalLayers.filter((layer) => layer.isVisible),
@@ -155,20 +215,58 @@ export function MapViewPage({
   )
 
   useEffect(() => {
-    setSessionDataset(dataset)
-  }, [dataset])
+    if (!hasWorkspaceHydrated || hasRestoredLocalSnapshot) {
+      return
+    }
+
+    try {
+      const snapshot = readLocalWorkspaceSnapshot()
+
+      if (snapshot) {
+        handleImportSession('Local workspace snapshot', 'replace', snapshot, [], {
+          silent: true,
+        })
+      } else {
+        initializeFromRoute({
+          dataset,
+          features,
+          layers,
+          uploadHistory,
+        })
+      }
+    } catch {
+      removeLocalWorkspaceSnapshot()
+      initializeFromRoute({
+        dataset,
+        features,
+        layers,
+        uploadHistory,
+      })
+    } finally {
+      setHasRestoredLocalSnapshot(true)
+    }
+  }, [
+    dataset,
+    features,
+    hasRestoredLocalSnapshot,
+    hasWorkspaceHydrated,
+    initializeFromRoute,
+    layers,
+    uploadHistory,
+  ])
 
   useEffect(() => {
-    setSessionFeatures(features)
-  }, [features])
+    if (hasSeenTour) {
+      return
+    }
 
-  useEffect(() => {
-    setSessionLayers(layers)
-  }, [layers])
+    const timer = window.setTimeout(() => {
+      startTour()
+      markTourSeen()
+    }, 550)
 
-  useEffect(() => {
-    setSessionUploadHistory(uploadHistory)
-  }, [uploadHistory])
+    return () => window.clearTimeout(timer)
+  }, [hasSeenTour, markTourSeen, startTour])
 
   const bboxSearchMutation = useMutation({
     mutationFn: searchAreaDataByBbox,
@@ -231,9 +329,22 @@ export function MapViewPage({
           status: 'success',
         }),
       )
+      pushToast({
+        description:
+          warnings.length > 0
+            ? warnings.join(' | ')
+            : 'The selected bounding box query finished successfully.',
+        title: 'Area query completed',
+        variant: warnings.length > 0 ? 'warning' : 'success',
+      })
     },
     onError: (error) => {
       setBboxSearchError(error.message)
+      pushToast({
+        description: error.message,
+        title: 'Area query failed',
+        variant: 'danger',
+      })
     },
   })
   const soilGridsPointSampleQuery = useQuery({
@@ -258,7 +369,11 @@ export function MapViewPage({
     [connectorDatasets, gbifOccurrenceFilters],
   )
   const visibleSessionFeatures = useMemo(
-    () => buildVisibleSessionFeatures(sessionFeatures, filteredConnectorDatasets),
+    () =>
+      buildVisibleSessionFeatures(
+        sessionFeatures ?? { type: 'FeatureCollection', features: [] },
+        filteredConnectorDatasets,
+      ),
     [sessionFeatures, filteredConnectorDatasets],
   )
   const selectedFeature = useMemo(
@@ -290,7 +405,7 @@ export function MapViewPage({
   const selectedNavigationContext = useMemo(
     () =>
       getInspectorNavigationContext({
-        baseFeatures: sessionFeatures,
+        baseFeatures: sessionFeatures ?? { type: 'FeatureCollection', features: [] },
         connectorDatasets,
         selectedFeature,
       }),
@@ -418,6 +533,7 @@ export function MapViewPage({
   }, [includeGbifInAreaQuery, includeMacrostratInAreaQuery])
   const exportMutation = useMutation({
     mutationFn: async () => {
+      setCsvExportStepLabel('Collecting visible occurrence records.')
       const visibleGbifDatasets = filteredConnectorDatasets.filter(
         (dataset) => dataset.sourceType === 'gbif' && dataset.isVisible,
       )
@@ -443,14 +559,28 @@ export function MapViewPage({
           })),
       )
 
-      const soilSampleItems =
-        visibleEnvironmentalLayers.length > 0 && visibleOccurrencePoints.length > 0
-          ? await requestSoilGridsBatchPointSample({
-              points: visibleOccurrencePoints,
-              layers: mapEnvironmentalLayersToSoilGridsRequest(visibleEnvironmentalLayers),
-            })
-          : []
+      let soilSampleItems: Awaited<ReturnType<typeof requestSoilGridsBatchPointSample>> = []
+      const soilSamplingWarnings: string[] = []
 
+      if (visibleEnvironmentalLayers.length > 0 && visibleOccurrencePoints.length > 0) {
+        setCsvExportStepLabel('Sampling SoilGrids values for visible occurrences.')
+        try {
+          const soilSamplingResult = await requestResilientSoilGridsSamples({
+            points: visibleOccurrencePoints,
+            layers: mapEnvironmentalLayersToSoilGridsRequest(visibleEnvironmentalLayers),
+          })
+          soilSampleItems = soilSamplingResult.items
+          soilSamplingWarnings.push(...soilSamplingResult.warnings)
+        } catch (error) {
+          soilSamplingWarnings.push(
+            error instanceof Error
+              ? error.message
+              : 'SoilGrids point sampling could not be completed for the export.',
+          )
+        }
+      }
+
+      setCsvExportStepLabel('Generating CSV rows and metadata.')
       const exportPayload = buildEnrichedOccurrencesExport({
         activeEnvironmentalLayers: visibleEnvironmentalLayers.map((layer) => ({
           id: layer.id,
@@ -481,16 +611,34 @@ export function MapViewPage({
       }
 
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+      setCsvExportStepLabel('Downloading CSV file.')
       downloadExportFile(
         exportPayload.csv,
         `bgsr-enriched-occurrences-${timestamp}.csv`,
         'text/csv;charset=utf-8',
       )
 
+      pushToast({
+        description: soilSamplingWarnings.length > 0
+          ? `${exportPayload.rowCount} visible occurrence rows were exported. SoilGrids notes: ${soilSamplingWarnings.join(' | ')}`
+          : `${exportPayload.rowCount} visible occurrence rows were exported.`,
+        title: soilSamplingWarnings.length > 0 ? 'CSV export ready with warning' : 'CSV export ready',
+        variant: soilSamplingWarnings.length > 0 ? 'warning' : 'success',
+      })
+
       return exportPayload.rowCount
     },
     onError: (error) => {
+      setCsvExportStepLabel('Preparing CSV export.')
       setBboxSearchError(error.message)
+      pushToast({
+        description: error.message,
+        title: 'CSV export failed',
+        variant: 'danger',
+      })
+    },
+    onSettled: () => {
+      setCsvExportStepLabel('Preparing CSV export.')
     },
   })
   const canExportCsv = filteredConnectorDatasets.some(
@@ -499,9 +647,67 @@ export function MapViewPage({
   const canExportSession =
     connectorDatasets.length > 0 ||
     environmentalLayers.length > 0 ||
-    sessionFeatures.features.length > 0
+    (sessionFeatures?.features.length ?? 0) > 0
+  const isWorkspaceEmpty =
+    connectorDatasets.length === 0 &&
+    environmentalLayers.length === 0 &&
+    (sessionFeatures?.features.length ?? 0) === 0 &&
+    !isStartCardDismissed
 
-  function handleImportSession(fileName: string, session: BgsrSessionImport) {
+  function handleImportSession(
+    fileName: string,
+    mode: 'merge' | 'replace',
+    session: BgsrSessionImport,
+    warnings: string[],
+    options?: {
+      silent?: boolean
+    },
+  ) {
+    if (mode === 'merge') {
+      replaceConnectorDatasets(
+        mergeUniqueById(connectorDatasets, session.sessionData.connectorDatasets),
+      )
+      replaceRecentQueries(
+        mergeUniqueById(recentQueries, session.sessionData.recentQueries),
+      )
+      replaceEnvironmentalLayers(
+        mergeUniqueById(environmentalLayers, session.layers.environmental),
+      )
+      setSessionUploadHistory(
+        mergeUniqueById(sessionUploadHistory, session.sessionData.uploadHistory),
+      )
+      setLastUploadResult(
+        createUploadResult({
+          featureCount:
+            session.sessionData.connectorDatasets.reduce(
+              (total, dataset) => total + dataset.collection.features.length,
+              0,
+            ) + session.layers.environmental.length,
+          idPrefix: 'bgsr-session-merge',
+          message: 'BGSR session data was merged into the current workspace.',
+          sourceName: fileName,
+          status: 'success',
+        }),
+      )
+      if (!options?.silent) {
+        pushToast({
+          description:
+            'Connector datasets, environmental layers, recent queries, and upload history were merged.',
+          title: 'Session merged',
+          variant: 'success',
+        })
+        warnings.forEach((warning) => {
+          pushToast({
+            description: warning,
+            title: 'Session compatibility note',
+            variant: 'warning',
+          })
+        })
+      }
+      return
+    }
+
+    resetLayerPresentation()
     const baseLayerVisibilityById = Object.fromEntries(
       session.layers.base.map((layer) => [layer.id, layer.isVisible]),
     )
@@ -554,17 +760,82 @@ export function MapViewPage({
     } else {
       setFocusCoordinates(null)
     }
+
+    if (!options?.silent) {
+      pushToast({
+        description:
+          'Datasets, filters, layers, and core map context were restored from the imported session.',
+        title: 'Session restored',
+        variant: 'success',
+      })
+      warnings.forEach((warning) => {
+        pushToast({
+          description: warning,
+          title: 'Session compatibility note',
+          variant: 'warning',
+        })
+      })
+    }
   }
 
-  function handleExportSession() {
-    const sessionPayload = buildBgsrSessionExport({
+  useEffect(() => {
+    if (!hasRestoredLocalSnapshot || !sessionDataset) {
+      return
+    }
+
+    writeLocalWorkspaceSnapshot({
       activePanel,
       activeTool,
       connectorDatasets,
       dataset: sessionDataset,
       environmentalLayers,
       environmentalProbeCoordinates,
-      features: sessionFeatures,
+      features: sessionFeatures ?? { type: 'FeatureCollection', features: [] },
+      gbifOccurrenceFilters,
+      hoveredFeatureId,
+      includeGbifInAreaQuery,
+      includeMacrostratInAreaQuery,
+      isResultsCollapsed,
+      layerOpacityById,
+      layerVisibilityById,
+      layers: sessionLayers,
+      recentQueries,
+      selection,
+      uploadHistory: sessionUploadHistory,
+      visibleFeatureCount,
+    })
+  }, [
+    activePanel,
+    activeTool,
+    connectorDatasets,
+    environmentalLayers,
+    environmentalProbeCoordinates,
+    gbifOccurrenceFilters,
+    hasRestoredLocalSnapshot,
+    hoveredFeatureId,
+    includeGbifInAreaQuery,
+    includeMacrostratInAreaQuery,
+    isResultsCollapsed,
+    layerOpacityById,
+    layerVisibilityById,
+    recentQueries,
+    selection,
+    sessionDataset,
+    sessionFeatures,
+    sessionLayers,
+    sessionUploadHistory,
+    visibleFeatureCount,
+  ])
+
+  function handleExportSession() {
+    const sessionPayload = buildBgsrSessionExport({
+      activePanel,
+      activeTool,
+      connectorDatasets,
+      dataset: sessionDataset ?? dataset,
+      environmentalLayers,
+      environmentalProbeCoordinates,
+      features: sessionFeatures ?? { type: 'FeatureCollection', features: [] },
       gbifOccurrenceFilters,
       hoveredFeatureId,
       includeGbifInAreaQuery,
@@ -585,6 +856,11 @@ export function MapViewPage({
       `bgsr-session-${timestamp}.bgsr.json`,
       'application/json;charset=utf-8',
     )
+    pushToast({
+      description: 'The current BGSR workspace was exported as a reusable session file.',
+      title: 'Session export ready',
+      variant: 'success',
+    })
     setIsExportModalOpen(false)
   }
   const gbifOccurrenceDetailQuery = useQuery({
@@ -625,7 +901,12 @@ export function MapViewPage({
       sourceType: 'shapefile',
     })
     setLastUploadResult(result)
-    setSessionUploadHistory((currentHistory) => [result, ...currentHistory])
+    setSessionUploadHistory([result, ...sessionUploadHistory])
+    pushToast({
+      description: `${result.featureCount} features were added from ${result.sourceName}.`,
+      title: 'Shapefile imported',
+      variant: 'success',
+    })
   }
 
   function handleClearAllConnectorDatasets() {
@@ -662,7 +943,7 @@ export function MapViewPage({
         focusDatasetId={focusDatasetId}
         focusFeatureCollection={focusFeatureCollection}
         layers={sessionLayers}
-        features={sessionFeatures}
+        features={sessionFeatures ?? { type: 'FeatureCollection', features: [] }}
         onFocusHandled={() => setFocusDatasetId(null)}
         onFocusFeatureCollectionHandled={() => setFocusFeatureCollection(null)}
         onBoundingBoxComplete={handleBoundingBoxComplete}
@@ -672,7 +953,7 @@ export function MapViewPage({
         <MapToolbar
           activePanel={activePanel}
           onOpenPanel={(panel) =>
-            setActivePanel((current) => (current === panel ? null : panel))
+            setActivePanel(activePanel === panel ? null : panel)
           }
         />
       </div>
@@ -682,6 +963,10 @@ export function MapViewPage({
         isLoading={bboxSearchMutation.isPending}
         loadingLabel={areaQueryLoadingLabel}
         onDismissError={() => setBboxSearchError(null)}
+      />
+      <CsvExportFeedbackBanner
+        currentStep={csvExportStepLabel}
+        isVisible={exportMutation.isPending}
       />
 
       {connectorDatasets.length > 0 ? (
@@ -729,7 +1014,7 @@ export function MapViewPage({
         <aside className="map-view-page__inspector" ref={rightSidebarRef}>
           {selectedFeature ? (
             <FeatureInspectorPanel
-              baseDataset={sessionDataset}
+              baseDataset={sessionDataset ?? dataset}
               connectorProvenance={selectedConnectorDataset?.provenance ?? null}
               feature={selectedFeature}
               gbifDetail={gbifOccurrenceDetailQuery.data ?? null}
@@ -795,6 +1080,7 @@ export function MapViewPage({
                   setFocusCoordinates(coordinates)
                 }
               }}
+              onOpenSources={() => setIsConnectorsModalOpen(true)}
             />
           ) : null}
           {hasRawBboxOccurrenceDatasets ? (
@@ -814,7 +1100,7 @@ export function MapViewPage({
                   ),
                 })
               }
-              onToggleCollapse={() => setIsResultsCollapsed((currentValue) => !currentValue)}
+              onToggleCollapse={() => setIsResultsCollapsed(!isResultsCollapsed)}
               summary={gbifOccurrenceSummary}
             />
           ) : null}
@@ -841,11 +1127,21 @@ export function MapViewPage({
             <div className="map-view-page__session-metric">
               <span>Status</span>
               <StatusBadge
-                label={sessionDataset.status}
-                tone={sessionDataset.status === 'processing' ? 'processing' : 'ready'}
+                label={(sessionDataset ?? dataset).status}
+                tone={(sessionDataset ?? dataset).status === 'processing' ? 'processing' : 'ready'}
               />
             </div>
           </div>
+        </aside>
+      ) : null}
+
+      {isWorkspaceEmpty ? (
+        <aside className="map-view-page__inspector">
+          <WorkspaceStartCard
+            onDismiss={dismissStartCard}
+            onOpenSources={() => setIsConnectorsModalOpen(true)}
+            onOpenTour={startTour}
+          />
         </aside>
       ) : null}
 
@@ -868,6 +1164,11 @@ export function MapViewPage({
       />
 
       <ConnectorsModal
+        hasActiveSession={
+          connectorDatasets.length > 0 ||
+          environmentalLayers.length > 0 ||
+          (sessionFeatures?.features.length ?? 0) > 0
+        }
         isOpen={isConnectorsModalOpen}
         onClose={() => setIsConnectorsModalOpen(false)}
         onConnectGbif={({ collection, provenance, sourceName }) => {
@@ -888,11 +1189,24 @@ export function MapViewPage({
               status: 'success',
             }),
           )
+          setFocusFeatureCollection(collection)
+          setSelection(null)
+          setHoveredFeatureId(null)
+          pushToast({
+            description: `${collection.features.length} GBIF occurrences were added to the session.`,
+            title: 'Observations connected',
+            variant: 'success',
+          })
           setIsConnectorsModalOpen(false)
         }}
         onAddEnvironmentalLayer={(layer) => {
           addEnvironmentalLayer(layer)
           setActivePanel('layers')
+          pushToast({
+            description: `${layer.label} is now available as an environmental layer.`,
+            title: 'Environmental layer added',
+            variant: 'success',
+          })
           setIsConnectorsModalOpen(false)
         }}
         onImportCsv={({ collection, provenance, sourceName }) => {
@@ -913,10 +1227,15 @@ export function MapViewPage({
               status: 'success',
             }),
           )
+          pushToast({
+            description: `${collection.features.length} georeferenced records were imported from ${sourceName}.`,
+            title: 'CSV imported',
+            variant: 'success',
+          })
           setIsConnectorsModalOpen(false)
         }}
-        onImportSession={({ fileName, session }) => {
-          handleImportSession(fileName, session)
+        onImportSession={({ fileName, mode, session, warnings }) => {
+          handleImportSession(fileName, mode, session, warnings)
           setIsConnectorsModalOpen(false)
         }}
         onOpenShapefileImport={() => {
@@ -930,9 +1249,9 @@ export function MapViewPage({
         includeMacrostrat={includeMacrostratInAreaQuery}
         isOpen={isAreaQuerySettingsOpen}
         onClose={() => setIsAreaQuerySettingsOpen(false)}
-        onToggleGbif={() => setIncludeGbifInAreaQuery((currentValue) => !currentValue)}
+        onToggleGbif={() => setIncludeGbifInAreaQuery(!includeGbifInAreaQuery)}
         onToggleMacrostrat={() =>
-          setIncludeMacrostratInAreaQuery((currentValue) => !currentValue)
+          setIncludeMacrostratInAreaQuery(!includeMacrostratInAreaQuery)
         }
       />
 

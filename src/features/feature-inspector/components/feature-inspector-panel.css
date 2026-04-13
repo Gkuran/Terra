@@ -66,6 +66,15 @@
   color: var(--boulder-color-text-secondary);
 }
 
+.feature-inspector-panel__empty {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.feature-inspector-panel__empty p {
+  margin: 0;
+}
+
 .feature-inspector-panel__note {
   margin: 0;
   color: var(--boulder-color-text-secondary);

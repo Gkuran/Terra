@@ -34,15 +34,14 @@ export function TerraHeader({
 
       <div className="terra-header__actions">
         <AppButton
-          aria-label="Export enriched occurrences"
+          aria-label="Open data sources"
           className="terra-header__action-button"
-          data-tour="header-export"
-          disabled={isExportDisabled || isExporting}
-          onClick={onOpenExport}
-          title="Export"
+          data-tour="header-sources"
+          onClick={onOpenConnectors}
+          title="Sources"
           variant="secondary"
         >
-          <LuDownload aria-hidden="true" />
+          <LuPlugZap aria-hidden="true" />
         </AppButton>
         <AppButton
           aria-label="Open query settings"
@@ -55,23 +54,25 @@ export function TerraHeader({
           <LuSettings2 aria-hidden="true" />
         </AppButton>
         <AppButton
+          aria-label="Export enriched occurrences"
+          className="terra-header__action-button"
+          data-tour="header-export"
+          disabled={isExportDisabled || isExporting}
+          onClick={onOpenExport}
+          title="Export"
+          variant="secondary"
+        >
+          <LuDownload aria-hidden="true" />
+        </AppButton>
+        <AppButton
           aria-label="Start guided tour"
           className="terra-header__action-button"
+          data-tour="header-tour"
           onClick={onOpenTour}
           title="Tour"
           variant="secondary"
         >
           <LuCircleHelp aria-hidden="true" />
-        </AppButton>
-        <AppButton
-          aria-label="Open data sources"
-          className="terra-header__action-button"
-          data-tour="header-sources"
-          onClick={onOpenConnectors}
-          title="Sources"
-          variant="secondary"
-        >
-          <LuPlugZap aria-hidden="true" />
         </AppButton>
       </div>
     </Header>

@@ -6,6 +6,7 @@ import type { LayerMetadata } from '@/entities/layer/model/layer-metadata'
 import type { ConnectorDataset } from '@/features/connectors/types/connector-dataset'
 import type { ConnectorQueryHistoryEntry } from '@/features/connectors/types/connector-query-history'
 import type { BgsrSessionImport } from '@/features/export/lib/bgsr-session-schema'
+import { currentBgsrSessionVersion } from '@/features/export/lib/bgsr-session-version'
 import type { EnvironmentalLayer } from '@/features/environmental-layers/types/environmental-layer'
 import type { UploadResult } from '@/features/shapefile-upload/types/upload-result'
 
@@ -326,16 +327,10 @@ function normalizeUploadHistory(value: unknown): UploadResult[] {
   }))
 }
 
-export async function parseBgsrSessionFile(file: File): Promise<BgsrSessionImport> {
-  const content = await file.text()
-  let parsedJson: unknown
-
-  try {
-    parsedJson = JSON.parse(content)
-  } catch {
-    throw new Error('BGSR session file is not valid JSON.')
-  }
-
+export function parseBgsrSessionFile(
+  parsedJson: unknown,
+  normalizedVersion = currentBgsrSessionVersion,
+): BgsrSessionImport {
   if (!isRecord(parsedJson) || parsedJson.format !== 'bgsr-session') {
     throw new Error('Selected file is not a BGSR session export.')
   }
@@ -415,6 +410,7 @@ export async function parseBgsrSessionFile(file: File): Promise<BgsrSessionImpor
       uploadHistoryCount: isRecord(parsedJson.summary) ? asNumber(parsedJson.summary.uploadHistoryCount) : 0,
       visibleBaseLayerCount: isRecord(parsedJson.summary) ? asNumber(parsedJson.summary.visibleBaseLayerCount) : undefined,
     },
-    version: 1,
+    version:
+      normalizedVersion === currentBgsrSessionVersion ? currentBgsrSessionVersion : 1,
   }
 }

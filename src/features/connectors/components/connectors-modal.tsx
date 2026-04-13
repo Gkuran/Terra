@@ -21,18 +21,20 @@ import { parseCsvToFeatures } from '@/features/connectors/csv/lib/parse-csv-to-f
 import { searchGbifOccurrences } from '@/features/connectors/gbif/lib/search-gbif-occurrences'
 import type { ConnectorDataset } from '@/features/connectors/types/connector-dataset'
 import type { BgsrSessionImport } from '@/features/export/lib/bgsr-session-schema'
-import { parseBgsrSessionFile } from '@/features/export/lib/parse-bgsr-session-file'
+import { readBgsrSessionFile } from '@/features/export/lib/read-bgsr-session-file'
 import { useConnectorDatasetsStore } from '@/features/connectors/stores/use-connector-datasets-store'
 import { fetchEnvironmentalLayerCatalog } from '@/features/environmental-layers/api/fetch-environmental-layer-catalog'
 import { requestSoilGridsLayer } from '@/features/environmental-layers/api/request-soilgrids-layer'
 import type { EnvironmentalLayer } from '@/features/environmental-layers/types/environmental-layer'
 import { AppButton } from '@/shared/ui/app-button/app-button'
+import { useToastStore } from '@/shared/ui/app-toast'
 
 import './connectors-modal.css'
 
 type ConnectorMode = 'observations' | 'environmental' | 'import'
 
 interface ConnectorsModalProps {
+  hasActiveSession: boolean
   isOpen: boolean
   onClose: () => void
   onImportCsv: (input: {
@@ -40,7 +42,12 @@ interface ConnectorsModalProps {
     provenance?: Partial<ConnectorDataset['provenance']>
     sourceName: string
   }) => void
-  onImportSession: (input: { fileName: string; session: BgsrSessionImport }) => void
+  onImportSession: (input: {
+    fileName: string
+    mode: 'merge' | 'replace'
+    session: BgsrSessionImport
+    warnings: string[]
+  }) => void
   onOpenShapefileImport: () => void
   onConnectGbif: (input: {
     collection: FeatureCollection<Geometry, FeatureProperties>
@@ -51,6 +58,7 @@ interface ConnectorsModalProps {
 }
 
 export function ConnectorsModal({
+  hasActiveSession,
   isOpen,
   onClose,
   onImportCsv,
@@ -60,8 +68,12 @@ export function ConnectorsModal({
   onAddEnvironmentalLayer,
 }: ConnectorsModalProps) {
   const recentQueries = useConnectorDatasetsStore((state) => state.recentQueries)
+  const pushToast = useToastStore((state) => state.pushToast)
   const [activeTab, setActiveTab] = useState<ConnectorMode>('observations')
   const [csvFeedback, setCsvFeedback] = useState<string | null>(null)
+  const [pendingSessionFileName, setPendingSessionFileName] = useState<string | null>(null)
+  const [pendingSessionImport, setPendingSessionImport] = useState<BgsrSessionImport | null>(null)
+  const [pendingSessionWarnings, setPendingSessionWarnings] = useState<string[]>([])
   const [scientificName, setScientificName] = useState('Araucaria angustifolia')
   const [country, setCountry] = useState('BR')
   const [stateProvince, setStateProvince] = useState('Rio Grande do Sul')
@@ -176,6 +188,9 @@ export function ConnectorsModal({
 
   function handleClose() {
     setCsvFeedback(null)
+    setPendingSessionFileName(null)
+    setPendingSessionImport(null)
+    setPendingSessionWarnings([])
     gbifMutation.reset()
     environmentalLayerMutation.reset()
     onClose()
@@ -200,6 +215,11 @@ export function ConnectorsModal({
       setCsvFeedback(
         `${collection.features.length} georeferenced records were imported from ${file.name}.`,
       )
+      pushToast({
+        description: `${collection.features.length} georeferenced records are ready to be added.`,
+        title: 'CSV parsed',
+        variant: 'info',
+      })
       onImportCsv({
         collection,
         provenance: {
@@ -230,21 +250,30 @@ export function ConnectorsModal({
     }
 
     try {
-      const session = await parseBgsrSessionFile(file)
-      setCsvFeedback(
-        `BGSR session imported from ${file.name} with ${session.sessionData.connectorDatasets.length} connector datasets and ${session.layers.environmental.length} environmental layers.`,
-      )
-      onImportSession({
-        fileName: file.name,
-        session,
+      const result = await readBgsrSessionFile(file)
+      setCsvFeedback(null)
+      setPendingSessionFileName(file.name)
+      setPendingSessionImport(result.session)
+      setPendingSessionWarnings(result.warnings)
+      pushToast({
+        description:
+          'Choose whether the imported BGSR session should replace or merge with the current workspace.',
+        title: 'Session file ready',
+        variant: 'info',
       })
-      onClose()
     } catch (error) {
-      setCsvFeedback(
+      const errorMessage =
         error instanceof Error
           ? error.message
-          : 'BGSR session import could not be completed.',
+          : 'BGSR session import could not be completed.'
+      setCsvFeedback(
+        errorMessage,
       )
+      pushToast({
+        description: errorMessage,
+        title: 'Session import failed',
+        variant: 'danger',
+      })
     } finally {
       event.target.value = ''
     }
@@ -469,7 +498,52 @@ export function ConnectorsModal({
                 <strong>Select a BGSR session file</strong>
                 <span>Use a `.bgsr.json` export to restore datasets, filters, layers, and core map state.</span>
               </label>
+              {pendingSessionImport && pendingSessionFileName ? (
+                <Alert variant="info">
+                  Ready to import <strong>{pendingSessionFileName}</strong> with{' '}
+                  {pendingSessionImport.sessionData.connectorDatasets.length} connector datasets and{' '}
+                  {pendingSessionImport.layers.environmental.length} environmental layers.
+                </Alert>
+              ) : null}
+              {pendingSessionWarnings.length > 0 ? (
+                <Alert variant="warning">
+                  {pendingSessionWarnings.join(' ')}
+                </Alert>
+              ) : null}
               {csvFeedback ? <Alert variant="info">{csvFeedback}</Alert> : null}
+              {pendingSessionImport && pendingSessionFileName ? (
+                <div className="connectors-modal__session-actions">
+                  <AppButton
+                    onClick={() => {
+                      onImportSession({
+                        fileName: pendingSessionFileName,
+                        mode: 'replace',
+                        session: pendingSessionImport,
+                        warnings: pendingSessionWarnings,
+                      })
+                      onClose()
+                    }}
+                    variant="primary"
+                  >
+                    Replace session
+                  </AppButton>
+                  <AppButton
+                    disabled={!hasActiveSession}
+                    onClick={() => {
+                      onImportSession({
+                        fileName: pendingSessionFileName,
+                        mode: 'merge',
+                        session: pendingSessionImport,
+                        warnings: pendingSessionWarnings,
+                      })
+                      onClose()
+                    }}
+                    variant="secondary"
+                  >
+                    Merge session
+                  </AppButton>
+                </div>
+              ) : null}
               <AppButton onClick={onOpenShapefileImport} variant="primary">
                 Open shapefile import
               </AppButton>

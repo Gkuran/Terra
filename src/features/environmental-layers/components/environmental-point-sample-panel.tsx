@@ -33,7 +33,7 @@ export function EnvironmentalPointSamplePanel({
   isLoading,
   samples,
 }: EnvironmentalPointSamplePanelProps) {
-  if (!coordinates && !errorMessage && !isLoading) {
+  if (!coordinates && !errorMessage && !isLoading && samples.length === 0) {
     return null
   }
 
@@ -80,6 +80,10 @@ export function EnvironmentalPointSamplePanel({
               </li>
             ))}
           </ul>
+        ) : coordinates && !isLoading && !errorMessage ? (
+          <p className="environmental-point-sample-panel__message">
+            No SoilGrids values were returned for this probe location.
+          </p>
         ) : null}
       </CardContent>
     </Card>

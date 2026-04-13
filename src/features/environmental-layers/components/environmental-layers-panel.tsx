@@ -47,7 +47,7 @@ export function EnvironmentalLayersPanel({
       <CardContent className="environmental-layers-panel__content">
         {layers.length === 0 ? (
           <div className="environmental-layers-panel__state">
-            No environmental layers are active in the session.
+            No environmental layers are active in the session. Open Sources to add SoilGrids context layers for the current workspace.
           </div>
         ) : (
           <ul className="environmental-layers-panel__list">

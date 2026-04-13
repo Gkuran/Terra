@@ -5,6 +5,7 @@ import Map, {
   Layer,
   type MapLayerMouseEvent,
   type MapRef,
+  Marker,
   NavigationControl,
   type MapMouseEvent,
   type MapStyleDataEvent,
@@ -116,6 +117,17 @@ interface MapCanvasProps {
 interface BoundingBoxDraft {
   current: [number, number]
   start: [number, number]
+}
+
+interface ConnectorDatasetDebugItem {
+  context: ConnectorDataset['context']
+  featureId: string
+  isHovered: boolean
+  isSelected: boolean
+  lat: number
+  lon: number
+  sourceType: ConnectorDataset['sourceType']
+  category: FeatureProperties['category']
 }
 
 function buildInteractiveLayerIds(layers: LayerMetadata[]) {
@@ -247,6 +259,43 @@ export function MapCanvas({
 
     return [...macrostratDatasets, ...remainingDatasets]
   }, [connectorDatasets])
+  const gbifMarkerItems = useMemo<ConnectorDatasetDebugItem[]>(
+    () =>
+      orderedConnectorDatasets.flatMap((dataset) => {
+        const shouldClusterGbifPoints =
+          dataset.sourceType === 'gbif' &&
+          dataset.collection.features.length >= gbifClusterThreshold
+
+        if (
+          dataset.sourceType !== 'gbif' ||
+          dataset.context !== 'manual' ||
+          shouldClusterGbifPoints ||
+          !dataset.isVisible
+        ) {
+          return []
+        }
+
+        return dataset.collection.features.flatMap((feature) => {
+          if (feature.geometry.type !== 'Point') {
+            return []
+          }
+
+          return [
+            {
+              context: dataset.context,
+              featureId: feature.properties.id,
+              isHovered: hoveredFeatureId === feature.properties.id,
+              isSelected: selection?.featureId === feature.properties.id,
+              lat: feature.geometry.coordinates[1],
+              lon: feature.geometry.coordinates[0],
+              sourceType: dataset.sourceType,
+              category: feature.properties.category,
+            },
+          ]
+        })
+      }),
+    [hoveredFeatureId, orderedConnectorDatasets, selection?.featureId],
+  )
   const bboxPreview = useMemo<FeatureCollection<Geometry, GeoJsonProperties> | null>(
     () => {
       if (!bboxDraft) {
@@ -568,7 +617,7 @@ export function MapCanvas({
     const shouldClusterGbifPoints =
       dataset.sourceType === 'gbif' &&
       dataset.collection.features.length >= gbifClusterThreshold
-    const shouldRenderCircleLayer = dataset.sourceType !== 'macrostrat'
+    const shouldRenderCircleLayer = dataset.sourceType !== 'macrostrat' && dataset.sourceType !== 'gbif'
 
     return (
       <Source
@@ -658,14 +707,16 @@ export function MapCanvas({
             type="symbol"
           />
         ) : null}
-        {shouldRenderCircleLayer && !shouldRenderSymbolLayer ? (
+        {shouldRenderCircleLayer ? (
           <Layer
             id={`${dataset.id}-circle`}
+            filter={shouldClusterGbifPoints ? ['!', ['has', 'point_count']] : undefined}
             paint={{
               'circle-color': dataset.color,
-              'circle-radius': 5,
+              'circle-opacity': dataset.sourceType === 'gbif' ? 0.7 : 1,
+              'circle-radius': dataset.sourceType === 'gbif' ? 3.5 : 5,
               'circle-stroke-color': '#fff7e7',
-              'circle-stroke-width': 1.5,
+              'circle-stroke-width': dataset.sourceType === 'gbif' ? 1 : 1.5,
             }}
             type="circle"
           />
@@ -796,6 +847,51 @@ export function MapCanvas({
 
         {orderedConnectorDatasets.map(renderConnectorDataset)}
 
+        {gbifMarkerItems.map((item) => (
+          <Marker
+            anchor="center"
+            key={item.featureId}
+            latitude={item.lat}
+            longitude={item.lon}
+          >
+            <button
+              aria-label="GBIF observation"
+              className={`map-canvas__gbif-marker map-canvas__gbif-marker--${item.category === 'flora' ? 'flora' : 'fauna'}${item.isHovered ? ' map-canvas__gbif-marker--hovered' : ''}${item.isSelected ? ' map-canvas__gbif-marker--selected' : ''}`}
+              onBlur={() => {
+                if (hoveredFeatureId === item.featureId) {
+                  setHoveredFeatureId(null)
+                }
+              }}
+              onClick={(event) => {
+                event.stopPropagation()
+                setSelection({
+                  featureId: item.featureId,
+                  layerId: 'gbif-marker',
+                  coordinates: [item.lon, item.lat],
+                })
+              }}
+              onMouseEnter={() => setHoveredFeatureId(item.featureId)}
+              onMouseLeave={() => {
+                if (hoveredFeatureId === item.featureId) {
+                  setHoveredFeatureId(null)
+                }
+              }}
+              type="button"
+            >
+              <img
+                alt=""
+                aria-hidden="true"
+                className="map-canvas__gbif-marker-icon"
+                src={buildIconDataUrl(
+                  item.category === 'flora'
+                    ? connectorFloraMarkerSvgMarkup
+                    : connectorFaunaMarkerSvgMarkup,
+                )}
+              />
+            </button>
+          </Marker>
+        ))}
+
         {bboxPreview ? (
           <Source data={bboxPreview} id="bbox-preview" type="geojson">
             <Layer
@@ -834,6 +930,7 @@ export function MapCanvas({
           </Popup>
         ) : null}
       </Map>
+
     </section>
   )
 }

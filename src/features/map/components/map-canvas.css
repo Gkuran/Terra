@@ -18,6 +18,37 @@
   font-size: 0.82rem;
 }
 
+.map-canvas__gbif-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    transform 140ms ease,
+    filter 140ms ease;
+}
+
+.map-canvas__gbif-marker--hovered,
+.map-canvas__gbif-marker:hover {
+  transform: scale(1.16);
+}
+
+.map-canvas__gbif-marker--selected {
+  filter: drop-shadow(0 0 0.38rem rgba(201, 141, 43, 0.55));
+}
+
+.map-canvas__gbif-marker-icon {
+  display: block;
+  width: 28px;
+  height: 28px;
+  pointer-events: none;
+}
+
 @media (max-width: 1100px) {
   .map-canvas,
   .map-canvas .maplibregl-map {

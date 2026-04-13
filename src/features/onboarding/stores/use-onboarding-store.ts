@@ -3,10 +3,12 @@ import { create } from 'zustand'
 interface OnboardingState {
   currentStepIndex: number
   hasCompletedTour: boolean
+  hasSeenTour: boolean
   isOpen: boolean
   closeTour: () => void
   completeTour: () => void
   goToNextStep: (stepCount: number) => void
+  markTourSeen: () => void
   goToPreviousStep: () => void
   startTour: () => void
 }
@@ -26,16 +28,25 @@ function readStoredCompletion() {
   }
 }
 
-function persistCompletion(hasCompletedTour: boolean) {
+function readStoredSeenState() {
+  if (typeof window === 'undefined') {
+    return false
+  }
+
+  try {
+    return window.localStorage.getItem(onboardingStorageKey) !== null
+  } catch {
+    return false
+  }
+}
+
+function persistTourState(state: 'completed' | 'seen') {
   if (typeof window === 'undefined') {
     return
   }
 
   try {
-    window.localStorage.setItem(
-      onboardingStorageKey,
-      hasCompletedTour ? 'completed' : 'incomplete',
-    )
+    window.localStorage.setItem(onboardingStorageKey, state)
   } catch {
     return
   }
@@ -44,13 +55,15 @@ function persistCompletion(hasCompletedTour: boolean) {
 export const useOnboardingStore = create<OnboardingState>((set) => ({
   currentStepIndex: 0,
   hasCompletedTour: readStoredCompletion(),
+  hasSeenTour: readStoredSeenState(),
   isOpen: false,
   closeTour: () => set({ isOpen: false }),
   completeTour: () => {
-    persistCompletion(true)
+    persistTourState('completed')
     set({
       currentStepIndex: 0,
       hasCompletedTour: true,
+      hasSeenTour: true,
       isOpen: false,
     })
   },
@@ -59,10 +72,11 @@ export const useOnboardingStore = create<OnboardingState>((set) => ({
       const nextIndex = state.currentStepIndex + 1
 
       if (nextIndex >= stepCount) {
-        persistCompletion(true)
+        persistTourState('completed')
         return {
           currentStepIndex: 0,
           hasCompletedTour: true,
+          hasSeenTour: true,
           isOpen: false,
         }
       }
@@ -71,6 +85,12 @@ export const useOnboardingStore = create<OnboardingState>((set) => ({
         currentStepIndex: nextIndex,
       }
     }),
+  markTourSeen: () => {
+    persistTourState('seen')
+    set({
+      hasSeenTour: true,
+    })
+  },
   goToPreviousStep: () =>
     set((state) => ({
       currentStepIndex: Math.max(0, state.currentStepIndex - 1),

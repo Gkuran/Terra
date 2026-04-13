@@ -12,18 +12,126 @@ import type { ConnectorQueryHistoryEntry } from '@/features/connectors/types/con
 
 const maxRecentConnectorQueries = 8
 
+function normalizePersistedQueryParams(
+  queryParams: Record<string, string | number | boolean | null>,
+) {
+  return Object.fromEntries(
+    Object.entries(queryParams).map(([key, value]) => [key, value === null ? '' : `${value}`]),
+  )
+}
+
+function normalizePersistedConnectorDataset(
+  dataset: z.infer<typeof connectorDatasetSchema>,
+): ConnectorDataset {
+  return ensureConnectorDatasetProvenance({
+    ...dataset,
+    collection: {
+      ...dataset.collection,
+      features: dataset.collection.features.map((feature, index) => {
+        const currentProperties = feature.properties
+
+        return {
+          ...feature,
+          properties: {
+            ...currentProperties,
+            id: currentProperties.id,
+            datasetId: currentProperties.datasetId,
+            title:
+              typeof currentProperties.title === 'string' &&
+              currentProperties.title.trim() !== ''
+                ? currentProperties.title
+                : `Imported feature ${index + 1}`,
+            category:
+              currentProperties.category === 'flora' ||
+              currentProperties.category === 'fauna' ||
+              currentProperties.category === 'biome' ||
+              currentProperties.category === 'soil' ||
+              currentProperties.category === 'geology'
+                ? currentProperties.category
+                : 'dataset',
+            biome:
+              typeof currentProperties.biome === 'string'
+                ? currentProperties.biome
+                : '',
+            municipality:
+              typeof currentProperties.municipality === 'string'
+                ? currentProperties.municipality
+                : '',
+            status:
+              currentProperties.status === 'attention' ||
+              currentProperties.status === 'critical'
+                ? currentProperties.status
+                : 'stable',
+            summary:
+              typeof currentProperties.summary === 'string'
+                ? currentProperties.summary
+                : '',
+            observedAt:
+              typeof currentProperties.observedAt === 'string'
+                ? currentProperties.observedAt
+                : '',
+            rawAttributes: currentProperties.rawAttributes
+              ? Object.fromEntries(
+                  Object.entries(currentProperties.rawAttributes).map(([key, value]) => [
+                    key,
+                    value === null ? '' : `${value}`,
+                  ]),
+                )
+              : undefined,
+          },
+        }
+      }),
+    },
+    provenance: dataset.provenance
+      ? {
+          ...dataset.provenance,
+          queryParams: normalizePersistedQueryParams(dataset.provenance.queryParams),
+        }
+      : undefined,
+  })
+}
+
+function normalizePersistedRecentQuery(
+  entry: {
+    id: string
+    context: 'bbox' | 'manual'
+    recordedAt: string
+    sourceType: 'csv' | 'gbif' | 'shapefile' | 'macrostrat' | 'wosis'
+    label: string
+    provenance: {
+      provider: 'CSV' | 'GBIF' | 'Macrostrat' | 'Shapefile' | 'WoSIS' | 'Unknown'
+      sourceName: string
+      importedAt: string
+      recordCount: number
+      queryLabel: string | null
+      queryParams: Record<string, string | number | boolean | null>
+      notes: string[]
+    }
+  },
+): ConnectorQueryHistoryEntry {
+  return {
+    ...entry,
+    provenance: {
+      ...entry.provenance,
+      queryParams: normalizePersistedQueryParams(entry.provenance.queryParams),
+    },
+  }
+}
+
 const connectorFeaturePropertiesSchema = z.object({
   id: z.string(),
-  title: z.string(),
-  category: z.enum(['flora', 'fauna', 'biome', 'soil', 'dataset', 'geology']),
+  title: z.string().optional(),
+  category: z
+    .enum(['flora', 'fauna', 'biome', 'soil', 'dataset', 'geology'])
+    .optional(),
   scientificName: z.string().optional(),
-  biome: z.string(),
-  municipality: z.string(),
-  status: z.enum(['stable', 'attention', 'critical']),
-  summary: z.string(),
-  observedAt: z.string(),
+  biome: z.string().optional(),
+  municipality: z.string().optional(),
+  status: z.enum(['stable', 'attention', 'critical']).optional(),
+  summary: z.string().optional(),
+  observedAt: z.string().optional(),
   datasetId: z.string(),
-  rawAttributes: z.record(z.string(), z.string()).optional(),
+  rawAttributes: z.record(z.string(), z.unknown()).optional(),
 }).catchall(z.unknown())
 
 const connectorFeatureSchema = z.object({
@@ -40,6 +148,10 @@ const connectorFeatureSchema = z.object({
     z.object({
       type: z.literal('MultiPolygon'),
       coordinates: z.array(z.array(z.array(z.tuple([z.number(), z.number()])))),
+    }),
+    z.object({
+      type: z.literal('LineString'),
+      coordinates: z.array(z.tuple([z.number(), z.number()])),
     }),
   ]),
   properties: connectorFeaturePropertiesSchema,
@@ -61,7 +173,10 @@ const connectorDatasetSchema = z.object({
       importedAt: z.string(),
       recordCount: z.number(),
       queryLabel: z.string().nullable(),
-      queryParams: z.record(z.string(), z.string()),
+      queryParams: z.record(
+        z.string(),
+        z.union([z.string(), z.number(), z.boolean(), z.null()]),
+      ),
       notes: z.array(z.string()),
     })
     .optional(),
@@ -87,7 +202,10 @@ const persistedConnectorDatasetsStateSchema = z.object({
           importedAt: z.string(),
           recordCount: z.number(),
           queryLabel: z.string().nullable(),
-          queryParams: z.record(z.string(), z.string()),
+          queryParams: z.record(
+            z.string(),
+            z.union([z.string(), z.number(), z.boolean(), z.null()]),
+          ),
           notes: z.array(z.string()),
         }),
       }),
@@ -195,9 +313,12 @@ export const useConnectorDatasetsStore = create<ConnectorDatasetsState>()(
         return {
           ...currentState,
           datasets: parsed.data.datasets.map((dataset) =>
-            ensureConnectorDatasetProvenance(dataset),
+            normalizePersistedConnectorDataset(dataset),
           ),
-          recentQueries: parsed.data.recentQueries ?? [],
+          recentQueries:
+            parsed.data.recentQueries?.map((entry) =>
+              normalizePersistedRecentQuery(entry),
+            ) ?? [],
         }
       },
     },

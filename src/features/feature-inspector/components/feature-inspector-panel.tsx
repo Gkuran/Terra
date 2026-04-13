@@ -33,7 +33,6 @@ import {
 } from '@/features/feature-inspector/lib/feature-inspector-formatters'
 import { useMapUiStore } from '@/features/map/stores/use-map-ui-store'
 import { AppButton } from '@/shared/ui/app-button/app-button'
-import { StatusBadge } from '@/shared/ui/status-badge/status-badge'
 
 import './feature-inspector-panel.css'
 
@@ -51,6 +50,7 @@ interface FeatureInspectorPanelProps {
     onPrevious: () => void
   } | null
   onCenterFeature: () => void
+  onOpenSources?: () => void
 }
 
 const mediaZoomLevels = [100, 125, 150, 200, 250, 300] as const
@@ -69,6 +69,7 @@ export function FeatureInspectorPanel({
   isGbifDetailLoading = false,
   navigation = null,
   onCenterFeature,
+  onOpenSources,
 }: FeatureInspectorPanelProps) {
   const setSelection = useMapUiStore((state) => state.setSelection)
   const properties = feature?.properties ?? null
@@ -174,7 +175,6 @@ export function FeatureInspectorPanel({
       <CardContent className="feature-inspector-panel__content">
         {properties ? (
           <>
-          <StatusBadge label={properties.status} tone={properties.status} />
           {shouldShowGbifMediaSkeleton ? (
             <figure className="feature-inspector-panel__media">
               <Skeleton
@@ -435,7 +435,14 @@ export function FeatureInspectorPanel({
           </>
         ) : (
           <div className="feature-inspector-panel__empty">
-            Select a polygon on the map to inspect scientific properties and metadata.
+            <p>
+              Select a feature on the map to inspect scientific properties and metadata.
+            </p>
+            {onOpenSources ? (
+              <AppButton onClick={onOpenSources} variant="secondary">
+                Open sources
+              </AppButton>
+            ) : null}
           </div>
         )}
       </CardContent>

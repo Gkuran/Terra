@@ -104,5 +104,12 @@ export function buildBgsrTourSteps({
       description:
         'Export creates analysis-ready CSV files or full BGSR session files that other users can import and reproduce.',
     },
+    {
+      id: 'tour-button',
+      target: '[data-tour="header-tour"]',
+      title: 'Replay the guide',
+      description:
+        'Use Tour at any time to reopen this guided walkthrough and revisit the main BGSR actions.',
+    },
   ]
 }

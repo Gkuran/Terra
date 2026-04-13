@@ -374,7 +374,7 @@ export function parseBgsrSessionFile(
     },
     map: {
       activePanel: map.activePanel === 'layers' ? 'layers' : null,
-      activeTool: map.activeTool === 'pan' || map.activeTool === 'bbox' ? map.activeTool : 'inspect',
+      activeTool: map.activeTool === 'bbox' ? 'bbox' : 'inspect',
       environmentalProbeCoordinates:
         Array.isArray(map.environmentalProbeCoordinates) &&
         typeof map.environmentalProbeCoordinates[0] === 'number' &&
@@ -382,6 +382,7 @@ export function parseBgsrSessionFile(
           ? [map.environmentalProbeCoordinates[0], map.environmentalProbeCoordinates[1]]
           : null,
       hoveredFeatureId: asNullableString(map.hoveredFeatureId),
+      isClimbingModeEnabled: asBoolean(map.isClimbingModeEnabled, false),
       selection:
         isRecord(map.selection) &&
         typeof map.selection.featureId === 'string' &&

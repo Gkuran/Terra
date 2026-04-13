@@ -101,3 +101,10 @@
     max-height: none;
   }
 }
+
+@media (max-width: 640px) {
+  .map-view-page {
+    gap: 0.75rem;
+    padding: 4.2rem 0.5rem 2.6rem;
+  }
+}

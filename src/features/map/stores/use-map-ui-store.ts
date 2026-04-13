@@ -2,7 +2,7 @@ import { create } from 'zustand'
 
 import type { MapSelection } from '@/features/map/types/map-selection'
 
-type MapTool = 'inspect' | 'pan' | 'bbox'
+type MapTool = 'inspect' | 'bbox'
 
 interface MapUiState {
   activeTool: MapTool

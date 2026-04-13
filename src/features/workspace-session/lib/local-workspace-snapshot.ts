@@ -40,5 +40,18 @@ export function writeLocalWorkspaceSnapshot(
   }
 
   const snapshot = buildBgsrSessionExport(input)
-  window.localStorage.setItem(localWorkspaceSnapshotKey, JSON.stringify(snapshot))
+
+  try {
+    window.localStorage.setItem(localWorkspaceSnapshotKey, JSON.stringify(snapshot))
+  } catch (error) {
+    if (
+      error instanceof DOMException &&
+      (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED')
+    ) {
+      console.warn('Skipping BGSR workspace snapshot write because localStorage quota was exceeded.')
+      return
+    }
+
+    throw error
+  }
 }

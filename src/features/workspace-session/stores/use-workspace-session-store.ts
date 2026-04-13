@@ -1,6 +1,7 @@
 import type { StorageValue } from 'zustand/middleware'
 import type { FeatureCollection, Geometry } from 'geojson'
 import { create } from 'zustand'
+import type { StateStorage } from 'zustand/middleware'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { z } from 'zod'
 
@@ -12,71 +13,6 @@ import {
   type GbifOccurrenceFilters,
 } from '@/features/connectors/lib/gbif-occurrence-filters'
 import type { UploadResult } from '@/features/shapefile-upload/types/upload-result'
-
-const datasetMetadataSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  description: z.string().optional(),
-  category: z.enum(['flora', 'fauna', 'biome', 'soil']),
-  regionLabel: z.string(),
-  featureCount: z.number(),
-  updatedAt: z.string(),
-  status: z.enum(['ready', 'processing', 'draft']),
-  tags: z.array(z.string()),
-})
-
-const featurePropertiesSchema = z
-  .object({
-    id: z.string(),
-    title: z.string().optional(),
-    category: z
-      .enum(['flora', 'fauna', 'biome', 'soil', 'dataset', 'geology'])
-      .optional(),
-    scientificName: z.string().optional(),
-    biome: z.string().optional(),
-    municipality: z.string().optional(),
-    status: z.enum(['stable', 'attention', 'critical']).optional(),
-    summary: z.string().optional(),
-    observedAt: z.string().optional(),
-    datasetId: z.string(),
-    rawAttributes: z.record(z.string(), z.unknown()).optional(),
-  })
-  .catchall(z.unknown())
-
-const featureCollectionSchema = z.object({
-  type: z.literal('FeatureCollection'),
-  features: z.array(
-    z.object({
-      type: z.literal('Feature'),
-      geometry: z.object({
-        type: z.string(),
-      }).catchall(z.unknown()),
-      properties: featurePropertiesSchema,
-    }),
-  ),
-})
-
-const layerMetadataSchema = z.object({
-  id: z.string(),
-  datasetId: z.string(),
-  name: z.string(),
-  description: z.string().optional(),
-  geometryType: z.enum(['fill', 'line', 'circle']),
-  color: z.string(),
-  defaultOpacity: z.number(),
-  isVisibleByDefault: z.boolean(),
-  featureCount: z.number(),
-  legendLabel: z.string(),
-})
-
-const uploadHistorySchema = z.object({
-  id: z.string(),
-  sourceName: z.string(),
-  featureCount: z.number(),
-  importedAt: z.string(),
-  status: z.enum(['success', 'error']),
-  message: z.string(),
-})
 
 const gbifOccurrenceFiltersSchema = z.object({
   includeFlora: z.boolean(),
@@ -92,16 +28,32 @@ const gbifOccurrenceFiltersSchema = z.object({
 const persistedWorkspaceSessionSchema = z.object({
   activePanel: z.union([z.literal('layers'), z.null()]),
   gbifOccurrenceFilters: gbifOccurrenceFiltersSchema,
-  hasInitialized: z.boolean(),
   includeGbifInAreaQuery: z.boolean(),
   includeMacrostratInAreaQuery: z.boolean(),
+  isClimbingModeEnabled: z.boolean().optional(),
   isResultsCollapsed: z.boolean(),
   isStartCardDismissed: z.boolean(),
-  sessionDataset: datasetMetadataSchema.nullable(),
-  sessionFeatures: featureCollectionSchema.nullable(),
-  sessionLayers: z.array(layerMetadataSchema),
-  sessionUploadHistory: z.array(uploadHistorySchema),
 })
+
+const safeLocalStorageStateStorage: StateStorage = {
+  getItem: (name) => window.localStorage.getItem(name),
+  removeItem: (name) => window.localStorage.removeItem(name),
+  setItem: (name, value) => {
+    try {
+      window.localStorage.setItem(name, value)
+    } catch (error) {
+      if (
+        error instanceof DOMException &&
+        (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED')
+      ) {
+        console.warn(`Skipping persisted workspace write for "${name}" because localStorage quota was exceeded.`)
+        return
+      }
+
+      throw error
+    }
+  },
+}
 
 interface InitializeWorkspaceSessionInput {
   dataset: DatasetMetadata
@@ -117,6 +69,7 @@ interface WorkspaceSessionState {
   hasInitialized: boolean
   includeGbifInAreaQuery: boolean
   includeMacrostratInAreaQuery: boolean
+  isClimbingModeEnabled: boolean
   isResultsCollapsed: boolean
   isStartCardDismissed: boolean
   sessionDataset: DatasetMetadata | null
@@ -130,6 +83,7 @@ interface WorkspaceSessionState {
   setGbifOccurrenceFilters: (filters: GbifOccurrenceFilters) => void
   setIncludeGbifInAreaQuery: (value: boolean) => void
   setIncludeMacrostratInAreaQuery: (value: boolean) => void
+  setIsClimbingModeEnabled: (value: boolean) => void
   setIsResultsCollapsed: (value: boolean) => void
   setSessionDataset: (dataset: DatasetMetadata) => void
   setSessionFeatures: (features: FeatureCollection<Geometry, FeatureProperties>) => void
@@ -146,6 +100,7 @@ export const useWorkspaceSessionStore = create<WorkspaceSessionState>()(
       hasInitialized: false,
       includeGbifInAreaQuery: true,
       includeMacrostratInAreaQuery: true,
+      isClimbingModeEnabled: false,
       isResultsCollapsed: true,
       isStartCardDismissed: false,
       sessionDataset: null,
@@ -173,6 +128,7 @@ export const useWorkspaceSessionStore = create<WorkspaceSessionState>()(
       setIncludeGbifInAreaQuery: (includeGbifInAreaQuery) => set({ includeGbifInAreaQuery }),
       setIncludeMacrostratInAreaQuery: (includeMacrostratInAreaQuery) =>
         set({ includeMacrostratInAreaQuery }),
+      setIsClimbingModeEnabled: (isClimbingModeEnabled) => set({ isClimbingModeEnabled }),
       setIsResultsCollapsed: (isResultsCollapsed) => set({ isResultsCollapsed }),
       setSessionDataset: (sessionDataset) => set({ hasInitialized: true, sessionDataset }),
       setSessionFeatures: (sessionFeatures) => set({ hasInitialized: true, sessionFeatures }),
@@ -185,18 +141,13 @@ export const useWorkspaceSessionStore = create<WorkspaceSessionState>()(
       partialize: (state) => ({
         activePanel: state.activePanel,
         gbifOccurrenceFilters: state.gbifOccurrenceFilters,
-        hasHydrated: state.hasHydrated,
-        hasInitialized: state.hasInitialized,
         includeGbifInAreaQuery: state.includeGbifInAreaQuery,
         includeMacrostratInAreaQuery: state.includeMacrostratInAreaQuery,
+        isClimbingModeEnabled: state.isClimbingModeEnabled,
         isResultsCollapsed: state.isResultsCollapsed,
         isStartCardDismissed: state.isStartCardDismissed,
-        sessionDataset: state.sessionDataset,
-        sessionFeatures: state.sessionFeatures,
-        sessionLayers: state.sessionLayers,
-        sessionUploadHistory: state.sessionUploadHistory,
       }),
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => safeLocalStorageStateStorage),
       merge: (persistedState, currentState) => {
         const parsed = persistedWorkspaceSessionSchema.safeParse(
           (persistedState as StorageValue<unknown> | undefined)?.state,
@@ -210,8 +161,6 @@ export const useWorkspaceSessionStore = create<WorkspaceSessionState>()(
           ...currentState,
           ...parsed.data,
           hasHydrated: true,
-          sessionFeatures:
-            parsed.data.sessionFeatures as FeatureCollection<Geometry, FeatureProperties> | null,
         }
       },
       onRehydrateStorage: () => (state) => state?.markHydrated(),

@@ -4,6 +4,7 @@ import type { FeatureCollection, Geometry } from 'geojson'
 
 import type { DatasetMetadata } from '@/entities/dataset/model/dataset'
 import type { FeatureProperties } from '@/entities/geographic-feature/model/geographic-feature'
+import { requestOSMClimbingFeatures } from '@/features/climbing-osm/api/request-osm-climbing-features'
 import { ConnectorLegendPanel } from '@/features/connectors/components/connector-legend-panel'
 import { ConnectorResultsPanel } from '@/features/connectors/components/connector-results-panel'
 import { ConnectorsModal } from '@/features/connectors/components/connectors-modal'
@@ -46,6 +47,7 @@ import { MapCanvas } from '@/features/map/components/map-canvas'
 import { MapToolbar } from '@/features/map/components/map-toolbar'
 import { useMapUiStore } from '@/features/map/stores/use-map-ui-store'
 import type { MapBoundingBox } from '@/features/map/types/map-bounding-box'
+import type { MapSearchViewport } from '@/features/map/types/map-search-viewport'
 import { useLayerPresentationStore } from '@/features/layers/stores/use-layer-presentation-store'
 import { UploadShapefileModal } from '@/features/shapefile-upload/components/upload-shapefile-modal'
 import { createUploadResult } from '@/features/shapefile-upload/lib/create-upload-result'
@@ -162,6 +164,9 @@ export function MapViewPage({
   const includeMacrostratInAreaQuery = useWorkspaceSessionStore(
     (state) => state.includeMacrostratInAreaQuery,
   )
+  const isClimbingModeEnabled = useWorkspaceSessionStore(
+    (state) => state.isClimbingModeEnabled,
+  )
   const initializeFromRoute = useWorkspaceSessionStore(
     (state) => state.initializeFromRoute,
   )
@@ -187,6 +192,9 @@ export function MapViewPage({
   const setIncludeMacrostratInAreaQuery = useWorkspaceSessionStore(
     (state) => state.setIncludeMacrostratInAreaQuery,
   )
+  const setIsClimbingModeEnabled = useWorkspaceSessionStore(
+    (state) => state.setIsClimbingModeEnabled,
+  )
   const setIsResultsCollapsed = useWorkspaceSessionStore(
     (state) => state.setIsResultsCollapsed,
   )
@@ -208,7 +216,10 @@ export function MapViewPage({
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
   const [isConnectorsModalOpen, setIsConnectorsModalOpen] = useState(false)
   const [isAreaQuerySettingsOpen, setIsAreaQuerySettingsOpen] = useState(false)
+  const [climbingViewport, setClimbingViewport] = useState<MapSearchViewport | null>(null)
+  const [hoveredClimbingLabel, setHoveredClimbingLabel] = useState<string | null>(null)
   const rightSidebarRef = useRef<HTMLElement | null>(null)
+  const lastClimbingErrorRef = useRef<string | null>(null)
   const visibleEnvironmentalLayers = useMemo(
     () => environmentalLayers.filter((layer) => layer.isVisible),
     [environmentalLayers],
@@ -364,6 +375,28 @@ export function MapViewPage({
         layers: mapEnvironmentalLayersToSoilGridsRequest(visibleEnvironmentalLayers),
       }),
   })
+  const climbingSitesQuery = useQuery({
+    enabled:
+      isClimbingModeEnabled &&
+      climbingViewport !== null &&
+      climbingViewport.zoom >= 7,
+    queryKey: [
+      'osm-climbing-sites',
+      climbingViewport?.west ?? 'none',
+      climbingViewport?.south ?? 'none',
+      climbingViewport?.east ?? 'none',
+      climbingViewport?.north ?? 'none',
+    ],
+    queryFn: ({ signal }) =>
+      requestOSMClimbingFeatures({
+        east: climbingViewport?.east ?? 0,
+        north: climbingViewport?.north ?? 0,
+        signal,
+        south: climbingViewport?.south ?? 0,
+        west: climbingViewport?.west ?? 0,
+      }),
+    staleTime: 60_000,
+  })
   const filteredConnectorDatasets = useMemo(
     () => filterConnectorDatasetsByGbifFilters(connectorDatasets, gbifOccurrenceFilters),
     [connectorDatasets, gbifOccurrenceFilters],
@@ -424,6 +457,7 @@ export function MapViewPage({
   const hoverTargetLabel =
     hoveredFeature?.properties.scientificName ??
     hoveredFeature?.properties.title ??
+    hoveredClimbingLabel ??
     hoveredFeatureId ??
     'No hover target'
   const visibleFeatureCount = visibleSessionFeatures.length
@@ -452,6 +486,23 @@ export function MapViewPage({
     ],
   )
   const currentTourStep = tourSteps[currentTourStepIndex] ?? null
+
+  useEffect(() => {
+    const errorMessage =
+      climbingSitesQuery.error instanceof Error ? climbingSitesQuery.error.message : null
+
+    if (!errorMessage || lastClimbingErrorRef.current === errorMessage) {
+      return
+    }
+
+    lastClimbingErrorRef.current = errorMessage
+    pushToast({
+      description: errorMessage,
+      title: 'OSM climbing mode failed',
+      variant: 'danger',
+    })
+  }, [climbingSitesQuery.error, pushToast])
+
   useEffect(() => {
     if (!isTourOpen || !currentTourStep) {
       return
@@ -738,6 +789,7 @@ export function MapViewPage({
     setEnvironmentalProbeCoordinates(session.map.environmentalProbeCoordinates)
     setIncludeGbifInAreaQuery(session.areaQuery.includeGbif)
     setIncludeMacrostratInAreaQuery(session.areaQuery.includeMacrostrat)
+    setIsClimbingModeEnabled(session.map.isClimbingModeEnabled ?? false)
     setIsResultsCollapsed(session.areaQuery.isResultsCollapsed)
     setGbifOccurrenceFilters(session.areaQuery.gbifFilters)
     setLastUploadResult(
@@ -795,6 +847,7 @@ export function MapViewPage({
       hoveredFeatureId,
       includeGbifInAreaQuery,
       includeMacrostratInAreaQuery,
+      isClimbingModeEnabled,
       isResultsCollapsed,
       layerOpacityById,
       layerVisibilityById,
@@ -815,6 +868,7 @@ export function MapViewPage({
     hoveredFeatureId,
     includeGbifInAreaQuery,
     includeMacrostratInAreaQuery,
+    isClimbingModeEnabled,
     isResultsCollapsed,
     layerOpacityById,
     layerVisibilityById,
@@ -840,6 +894,7 @@ export function MapViewPage({
       hoveredFeatureId,
       includeGbifInAreaQuery,
       includeMacrostratInAreaQuery,
+      isClimbingModeEnabled,
       isResultsCollapsed,
       layerOpacityById,
       layerVisibilityById,
@@ -938,15 +993,19 @@ export function MapViewPage({
       />
 
       <MapCanvas
+        climbingFeatures={climbingSitesQuery.data ?? []}
         connectorDatasets={filteredConnectorDatasets}
         environmentalLayers={environmentalLayers}
         focusDatasetId={focusDatasetId}
         focusFeatureCollection={focusFeatureCollection}
-        layers={sessionLayers}
         features={sessionFeatures ?? { type: 'FeatureCollection', features: [] }}
+        isClimbingModeEnabled={isClimbingModeEnabled}
+        layers={sessionLayers}
+        onClimbingFeatureHoverChange={setHoveredClimbingLabel}
         onFocusHandled={() => setFocusDatasetId(null)}
         onFocusFeatureCollectionHandled={() => setFocusFeatureCollection(null)}
         onBoundingBoxComplete={handleBoundingBoxComplete}
+        onViewportChange={setClimbingViewport}
       />
 
       <div className="map-view-page__dock">
@@ -1147,9 +1206,24 @@ export function MapViewPage({
 
       <TerraFooter
         credit="Developed by Gabriel Adornes"
-        githubUrl="https://github.com/Gkuran"
+        githubUrl="https://github.com/Gkuran/BGSR"
         hoverTarget={hoverTargetLabel}
+        isClimbingModeEnabled={isClimbingModeEnabled}
         linkedinUrl="https://www.linkedin.com/in/gabriel-adornes-58a86b218"
+        onToggleClimbingMode={() => {
+          const nextValue = !isClimbingModeEnabled
+
+          setIsClimbingModeEnabled(nextValue)
+          setHoveredClimbingLabel(null)
+          pushToast({
+            description: nextValue
+              ? 'OSM climbing places will load from the current map view as you navigate.'
+              : 'OSM climbing places were hidden from the map.',
+            title: nextValue ? 'Climbing mode enabled' : 'Climbing mode disabled',
+            variant: nextValue ? 'success' : 'info',
+          })
+        }}
+        showClimbingModeButton={false}
       />
 
       <UploadShapefileModal

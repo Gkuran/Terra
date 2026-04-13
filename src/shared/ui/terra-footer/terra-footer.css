@@ -61,6 +61,7 @@
     border-color 180ms ease,
     color 180ms ease,
     transform 180ms ease;
+  cursor: pointer;
 }
 
 .terra-footer__link:hover,
@@ -69,6 +70,16 @@
   border-color: rgba(24, 49, 42, 0.28);
   background: rgba(255, 255, 255, 0.86);
   transform: translateY(-1px);
+}
+
+.terra-footer__link--action {
+  appearance: none;
+}
+
+.terra-footer__link--active {
+  color: #18312a;
+  border-color: rgba(24, 49, 42, 0.34);
+  background: rgba(224, 236, 224, 0.94);
 }
 
 .terra-footer__value {
@@ -92,5 +103,39 @@
 
   .terra-footer__section--credit {
     justify-content: space-between;
+  }
+}
+
+@media (max-width: 640px) {
+  .terra-footer__content {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    min-height: 2.05rem;
+    padding: 0.28rem 0.65rem;
+  }
+
+  .terra-footer__section:first-child {
+    display: none;
+  }
+
+  .terra-footer__section,
+  .terra-footer__section--credit {
+    width: auto;
+  }
+
+  .terra-footer__mobile-hidden {
+    display: none;
+  }
+
+  .terra-footer__links {
+    gap: 0.25rem;
+  }
+
+  .terra-footer__link {
+    width: 1.45rem;
+    height: 1.45rem;
+    font-size: 0.8rem;
   }
 }

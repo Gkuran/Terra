@@ -1,5 +1,5 @@
 import { Card, CardContent } from 'boulder-ui'
-import { LuEraser, LuGalleryVerticalEnd, LuHand, LuInfo, LuSquare } from 'react-icons/lu'
+import { LuEraser, LuGalleryVerticalEnd, LuInfo, LuSquare } from 'react-icons/lu'
 
 import { useMapUiStore } from '@/features/map/stores/use-map-ui-store'
 import { AppButton } from '@/shared/ui/app-button/app-button'
@@ -51,16 +51,6 @@ export function MapToolbar({
           variant={activeTool === 'inspect' ? 'primary' : 'secondary'}
         >
           <LuInfo aria-hidden="true" />
-        </AppButton>
-        <AppButton
-          aria-label="Enable pan tool"
-          aria-pressed={activeTool === 'pan'}
-          className="map-toolbar__button"
-          onClick={() => setActiveTool('pan')}
-          title="Pan"
-          variant={activeTool === 'pan' ? 'primary' : 'secondary'}
-        >
-          <LuHand aria-hidden="true" />
         </AppButton>
         <AppButton
           aria-label="Clear current selection"

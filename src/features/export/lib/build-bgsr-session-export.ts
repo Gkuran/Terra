@@ -12,7 +12,7 @@ import type { UploadResult } from '@/features/shapefile-upload/types/upload-resu
 
 interface BuildBgsrSessionExportInput {
   activePanel: 'layers' | null
-  activeTool: 'inspect' | 'pan' | 'bbox'
+  activeTool: 'inspect' | 'bbox'
   connectorDatasets: ConnectorDataset[]
   dataset: DatasetMetadata
   environmentalLayers: EnvironmentalLayer[]
@@ -22,6 +22,7 @@ interface BuildBgsrSessionExportInput {
   hoveredFeatureId: string | null
   includeGbifInAreaQuery: boolean
   includeMacrostratInAreaQuery: boolean
+  isClimbingModeEnabled: boolean
   isResultsCollapsed: boolean
   layerOpacityById: Record<string, number>
   layerVisibilityById: Record<string, boolean>
@@ -44,6 +45,7 @@ export function buildBgsrSessionExport({
   hoveredFeatureId,
   includeGbifInAreaQuery,
   includeMacrostratInAreaQuery,
+  isClimbingModeEnabled,
   isResultsCollapsed,
   layerOpacityById,
   layerVisibilityById,
@@ -69,6 +71,7 @@ export function buildBgsrSessionExport({
       activeTool,
       environmentalProbeCoordinates,
       hoveredFeatureId,
+      isClimbingModeEnabled,
       selection,
       visibleFeatureCount,
     },

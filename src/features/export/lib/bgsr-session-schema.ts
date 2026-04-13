@@ -169,9 +169,10 @@ export const bgsrSessionSchema = z.object({
   dataset: datasetMetadataSchema,
   map: z.object({
     activePanel: z.union([z.literal('layers'), z.null()]),
-    activeTool: z.enum(['inspect', 'pan', 'bbox']),
+    activeTool: z.enum(['inspect', 'bbox']),
     environmentalProbeCoordinates: z.tuple([z.number(), z.number()]).nullable(),
     hoveredFeatureId: z.string().nullable(),
+    isClimbingModeEnabled: z.boolean().optional(),
     selection: mapSelectionSchema.nullable(),
     visibleFeatureCount: z.number(),
   }),
@@ -238,9 +239,10 @@ export interface BgsrSessionImport {
   }
   map: {
     activePanel: 'layers' | null
-    activeTool: 'inspect' | 'pan' | 'bbox'
+    activeTool: 'inspect' | 'bbox'
     environmentalProbeCoordinates: [number, number] | null
     hoveredFeatureId: string | null
+    isClimbingModeEnabled?: boolean
     selection: MapSelection | null
     visibleFeatureCount: number
   }

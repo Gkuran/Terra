@@ -60,3 +60,38 @@
     right: 0.5rem;
   }
 }
+
+@media (max-width: 640px) {
+  .terra-header {
+    left: 0.35rem;
+    right: 0.35rem;
+  }
+
+  .terra-header._compact_hn393_56 {
+    min-height: 3.65rem;
+    padding-top: 0.35rem;
+    padding-bottom: 0.35rem;
+  }
+
+  .terra-header__brandcopy {
+    min-height: 2rem;
+  }
+
+  .terra-header__subtitle {
+    display: none;
+  }
+
+  .terra-header__actions {
+    gap: 0.35rem;
+    min-height: 2.1rem;
+  }
+
+  .terra-header__action-button {
+    min-width: 2.15rem;
+    min-height: 2.15rem;
+  }
+
+  .terra-header__action-button[data-mobile-hidden='true'] {
+    display: none;
+  }
+}

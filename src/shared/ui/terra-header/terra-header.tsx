@@ -68,6 +68,7 @@ export function TerraHeader({
           aria-label="Start guided tour"
           className="terra-header__action-button"
           data-tour="header-tour"
+          data-mobile-hidden="true"
           onClick={onOpenTour}
           title="Tour"
           variant="secondary"

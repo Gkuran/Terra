@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { GeoJSONSource } from 'maplibre-gl'
 import type { Feature, FeatureCollection, GeoJsonProperties, Geometry } from 'geojson'
+import { LuMountain } from 'react-icons/lu'
 import Map, {
   Layer,
   type MapLayerMouseEvent,
@@ -20,6 +21,7 @@ import {
   connectorFaunaMarkerSvgMarkup,
   connectorFloraMarkerSvgMarkup,
 } from '@/features/connectors/lib/connector-marker-icons'
+import type { OSMClimbingFeature } from '@/features/climbing-osm/types/osm-climbing-feature'
 import type { ConnectorDataset } from '@/features/connectors/types/connector-dataset'
 import type { EnvironmentalLayer } from '@/features/environmental-layers/types/environmental-layer'
 import { useLayerPresentationStore } from '@/features/layers/stores/use-layer-presentation-store'
@@ -27,6 +29,7 @@ import { buildVisibleSessionFeatures } from '@/features/map/lib/build-visible-se
 import { getFeatureCollectionBounds } from '@/features/map/lib/get-feature-collection-bounds'
 import { useMapUiStore } from '@/features/map/stores/use-map-ui-store'
 import type { MapBoundingBox } from '@/features/map/types/map-bounding-box'
+import type { MapSearchViewport } from '@/features/map/types/map-search-viewport'
 import { env } from '@/shared/config/env'
 
 import './map-canvas.css'
@@ -106,12 +109,16 @@ interface MapCanvasProps {
   features: FeatureCollection<Geometry, FeatureProperties>
   layers: LayerMetadata[]
   connectorDatasets: ConnectorDataset[]
+  climbingFeatures: OSMClimbingFeature[]
   environmentalLayers: EnvironmentalLayer[]
   focusDatasetId: string | null
   focusFeatureCollection: FeatureCollection<Geometry, FeatureProperties> | null
+  isClimbingModeEnabled: boolean
   onFocusHandled: () => void
   onFocusFeatureCollectionHandled: () => void
   onBoundingBoxComplete: (bbox: MapBoundingBox) => void
+  onClimbingFeatureHoverChange: (label: string | null) => void
+  onViewportChange: (viewport: MapSearchViewport) => void
 }
 
 interface BoundingBoxDraft {
@@ -142,12 +149,16 @@ export function MapCanvas({
   features,
   layers,
   connectorDatasets,
+  climbingFeatures,
   environmentalLayers,
   focusDatasetId,
   focusFeatureCollection,
+  isClimbingModeEnabled,
   onFocusHandled,
   onFocusFeatureCollectionHandled,
   onBoundingBoxComplete,
+  onClimbingFeatureHoverChange,
+  onViewportChange,
 }: MapCanvasProps) {
   const mapRef = useRef<MapRef | null>(null)
   const visibilityById = useLayerPresentationStore((state) => state.visibilityById)
@@ -164,7 +175,33 @@ export function MapCanvas({
   const setHoveredFeatureId = useMapUiStore((state) => state.setHoveredFeatureId)
   const [bboxDraft, setBboxDraft] = useState<BoundingBoxDraft | null>(null)
   const [areConnectorIconsReady, setAreConnectorIconsReady] = useState(false)
+  const [selectedClimbingFeatureId, setSelectedClimbingFeatureId] = useState<string | null>(null)
   const hasVisibleEnvironmentalLayers = environmentalLayers.some((layer) => layer.isVisible)
+
+  const selectedClimbingFeature = useMemo(
+    () =>
+      selectedClimbingFeatureId
+        ? climbingFeatures.find((feature) => feature.id === selectedClimbingFeatureId) ?? null
+        : null,
+    [climbingFeatures, selectedClimbingFeatureId],
+  )
+
+  function publishViewport() {
+    if (!mapRef.current) {
+      return
+    }
+
+    const map = mapRef.current.getMap()
+    const bounds = map.getBounds()
+
+    onViewportChange({
+      east: Number(bounds.getEast().toFixed(4)),
+      north: Number(bounds.getNorth().toFixed(4)),
+      south: Number(bounds.getSouth().toFixed(4)),
+      west: Number(bounds.getWest().toFixed(4)),
+      zoom: Number(map.getZoom().toFixed(2)),
+    })
+  }
 
   async function ensureConnectorIconsLoaded() {
     if (!mapRef.current) {
@@ -197,6 +234,7 @@ export function MapCanvas({
 
   function handleMapLoad() {
     void ensureConnectorIconsLoaded()
+    publishViewport()
   }
 
   function handleMapStyleData(_event: MapStyleDataEvent) {
@@ -343,6 +381,22 @@ export function MapCanvas({
   }, [selectedFeature, selection, setSelection])
 
   useEffect(() => {
+    if (
+      selectedClimbingFeatureId &&
+      !climbingFeatures.some((feature) => feature.id === selectedClimbingFeatureId)
+    ) {
+      setSelectedClimbingFeatureId(null)
+    }
+  }, [climbingFeatures, selectedClimbingFeatureId])
+
+  useEffect(() => {
+    if (!isClimbingModeEnabled) {
+      setSelectedClimbingFeatureId(null)
+      onClimbingFeatureHoverChange(null)
+    }
+  }, [isClimbingModeEnabled, onClimbingFeatureHoverChange])
+
+  useEffect(() => {
     const latestDataset = connectorDatasets.at(-1)
 
     if (!latestDataset || latestDataset.collection.features.length === 0) {
@@ -434,6 +488,9 @@ export function MapCanvas({
   }, [focusCoordinates, setFocusCoordinates])
 
   function handleMapClick(event: MapMouseEvent) {
+    setSelectedClimbingFeatureId(null)
+    onClimbingFeatureHoverChange(null)
+
     if (activeTool !== 'inspect') {
       return
     }
@@ -814,6 +871,7 @@ export function MapCanvas({
         onMouseLeave={() => setHoveredFeatureId(null)}
         onMouseMove={handleMapMouseMove}
         onMouseDown={handleMapMouseDown}
+        onMoveEnd={publishViewport}
         onMouseUp={handleMapMouseUp}
         onStyleData={handleMapStyleData}
         ref={mapRef}
@@ -892,6 +950,33 @@ export function MapCanvas({
           </Marker>
         ))}
 
+        {isClimbingModeEnabled
+          ? climbingFeatures.map((feature) => (
+              <Marker
+                anchor="center"
+                key={feature.id}
+                latitude={feature.coordinates[1]}
+                longitude={feature.coordinates[0]}
+              >
+                <button
+                  aria-label={feature.name}
+                  className={`map-canvas__climbing-marker${selectedClimbingFeatureId === feature.id ? ' map-canvas__climbing-marker--selected' : ''}`}
+                  onBlur={() => onClimbingFeatureHoverChange(null)}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setSelectedClimbingFeatureId(feature.id)
+                  }}
+                  onMouseEnter={() => onClimbingFeatureHoverChange(feature.name)}
+                  onMouseLeave={() => onClimbingFeatureHoverChange(null)}
+                  title={feature.name}
+                  type="button"
+                >
+                  <LuMountain aria-hidden="true" />
+                </button>
+              </Marker>
+            ))
+          : null}
+
         {bboxPreview ? (
           <Source data={bboxPreview} id="bbox-preview" type="geojson">
             <Layer
@@ -926,6 +1011,30 @@ export function MapCanvas({
             <div className="map-canvas__popup">
               <strong>{selectedFeature.properties?.title}</strong>
               <span>{selectedFeature.properties?.municipality}</span>
+            </div>
+          </Popup>
+        ) : null}
+
+        {selectedClimbingFeature ? (
+          <Popup
+            anchor="bottom"
+            closeButton={false}
+            closeOnClick={false}
+            latitude={selectedClimbingFeature.coordinates[1]}
+            longitude={selectedClimbingFeature.coordinates[0]}
+            offset={14}
+          >
+            <div className="map-canvas__popup">
+              <strong>{selectedClimbingFeature.name}</strong>
+              <span>{selectedClimbingFeature.discipline.replace('-', ' ')}</span>
+              {selectedClimbingFeature.tags.website ? (
+                <a href={selectedClimbingFeature.tags.website} rel="noreferrer" target="_blank">
+                  Website
+                </a>
+              ) : null}
+              <a href={selectedClimbingFeature.url} rel="noreferrer" target="_blank">
+                Open in OpenStreetMap
+              </a>
             </div>
           </Popup>
         ) : null}

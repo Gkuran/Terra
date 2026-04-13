@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { env } from '@/shared/config/env'
+import { getRequiredApiBaseUrl } from '@/shared/config/env'
 
 const gbifOccurrenceMediaSchema = z.object({
   type: z.string(),
@@ -71,9 +71,8 @@ export function extractGbifOccurrenceKey(featureId: string, rawAttributes?: Reco
 }
 
 export async function requestGbifOccurrenceDetail(occurrenceKey: number) {
-  const response = await fetch(
-    `${env.VITE_API_BASE_URL}/api/v1/occurrences/${occurrenceKey}`,
-  )
+  const apiBaseUrl = getRequiredApiBaseUrl('GBIF occurrence detail requests')
+  const response = await fetch(`${apiBaseUrl}/api/v1/occurrences/${occurrenceKey}`)
 
   if (!response.ok) {
     throw new Error('GBIF occurrence detail could not be loaded.')

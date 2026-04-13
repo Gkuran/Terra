@@ -49,6 +49,33 @@
   pointer-events: none;
 }
 
+.map-canvas__climbing-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid rgba(24, 49, 42, 0.24);
+  border-radius: 999px;
+  background: rgba(255, 250, 240, 0.96);
+  color: #5c4321;
+  cursor: pointer;
+  box-shadow: 0 0.2rem 0.65rem rgba(24, 49, 42, 0.12);
+  transition:
+    transform 140ms ease,
+    box-shadow 140ms ease,
+    background-color 140ms ease;
+}
+
+.map-canvas__climbing-marker:hover,
+.map-canvas__climbing-marker:focus-visible,
+.map-canvas__climbing-marker--selected {
+  transform: scale(1.08);
+  background: rgba(255, 244, 220, 1);
+  box-shadow: 0 0.25rem 0.8rem rgba(92, 67, 33, 0.22);
+}
+
 @media (max-width: 1100px) {
   .map-canvas,
   .map-canvas .maplibregl-map {

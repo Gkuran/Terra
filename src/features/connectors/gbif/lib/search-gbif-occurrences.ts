@@ -2,7 +2,7 @@ import type { FeatureCollection, Geometry } from 'geojson'
 import { z } from 'zod'
 
 import type { FeatureProperties } from '@/entities/geographic-feature/model/geographic-feature'
-import { env } from '@/shared/config/env'
+import { getRequiredApiBaseUrl } from '@/shared/config/env'
 
 const GBIF_API_BASE_URL = 'https://api.gbif.org/v1'
 const ANIMALIA_KINGDOM_KEY = '1'
@@ -95,11 +95,8 @@ export async function searchGbifOccurrences({
     throw new Error('Country code is required for GBIF searches.')
   }
 
-  if (!env.VITE_API_BASE_URL) {
-    return searchGbifOccurrencesDirectly(normalizedInput)
-  }
-
-  const response = await fetch(`${env.VITE_API_BASE_URL}/api/v1/occurrences/search`, {
+  const apiBaseUrl = getRequiredApiBaseUrl('GBIF searches')
+  const response = await fetch(`${apiBaseUrl}/api/v1/occurrences/search`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -114,7 +111,7 @@ export async function searchGbifOccurrences({
     return parsed.feature_collection as FeatureCollection<Geometry, FeatureProperties>
   }
 
-  if (response.status === 404 || response.status === 405) {
+  if (!import.meta.env.PROD && (response.status === 404 || response.status === 405)) {
     return searchGbifOccurrencesDirectly(normalizedInput)
   }
 

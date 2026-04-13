@@ -23,3 +23,24 @@
   width: 1.1rem;
   height: 1.1rem;
 }
+
+@media (max-width: 640px) {
+  .map-toolbar {
+    width: auto;
+  }
+
+  .map-toolbar__content {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.35rem;
+  }
+
+  .map-toolbar__button {
+    min-width: 2.3rem;
+    min-height: 2.3rem;
+  }
+
+  .map-toolbar__button svg {
+    width: 1rem;
+    height: 1rem;
+  }
+}

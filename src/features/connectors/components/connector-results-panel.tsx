@@ -5,6 +5,7 @@ import type {
   GbifOccurrenceFilters,
   GbifOccurrenceSummary,
 } from '@/features/connectors/lib/gbif-occurrence-filters'
+import { summarizeConnectorDataset } from '@/features/connectors/lib/summarize-connector-dataset'
 import type { ConnectorDataset } from '@/features/connectors/types/connector-dataset'
 import { AppButton } from '@/shared/ui/app-button/app-button'
 
@@ -14,44 +15,25 @@ interface ConnectorResultsPanelProps {
   datasets: ConnectorDataset[]
   filters: GbifOccurrenceFilters
   availableBasisOfRecord: string[]
+  availableCountries: string[]
+  availableStates: string[]
   summary: GbifOccurrenceSummary
   isCollapsed: boolean
   onFiltersChange: (nextFilters: GbifOccurrenceFilters) => void
+  onFitToFilteredResults: () => void
   onToggleCollapse: () => void
-}
-
-function buildDatasetTopSpecies(dataset: ConnectorDataset) {
-  const groupedBySpecies = new Map<string, { count: number; kingdom: string }>()
-
-  for (const feature of dataset.collection.features) {
-    const scientificName =
-      feature.properties.scientificName?.trim() || feature.properties.title.trim()
-    const kingdom = feature.properties.rawAttributes?.kingdom || 'Unclassified'
-    const currentEntry = groupedBySpecies.get(scientificName)
-
-    groupedBySpecies.set(scientificName, {
-      count: (currentEntry?.count ?? 0) + 1,
-      kingdom,
-    })
-  }
-
-  return [...groupedBySpecies.entries()]
-    .map(([scientificName, entry]) => ({
-      scientificName,
-      kingdom: entry.kingdom,
-      count: entry.count,
-    }))
-    .sort((left, right) => right.count - left.count)
-    .slice(0, 6)
 }
 
 export function ConnectorResultsPanel({
   datasets,
   filters,
   availableBasisOfRecord,
+  availableCountries,
+  availableStates,
   summary,
   isCollapsed,
   onFiltersChange,
+  onFitToFilteredResults,
   onToggleCollapse,
 }: ConnectorResultsPanelProps) {
   const hasActiveFilters =
@@ -59,11 +41,13 @@ export function ConnectorResultsPanel({
     !filters.includeFauna ||
     filters.requireImage ||
     filters.basisOfRecord !== null ||
+    filters.country !== null ||
+    filters.stateProvince !== null ||
     filters.yearFrom.trim() !== '' ||
     filters.yearTo.trim() !== ''
 
   return (
-    <Card className="connector-results-panel" variant="default">
+    <Card className="connector-results-panel" data-tour="query-results-panel" variant="default">
       <CardHeader className="connector-results-panel__header">
         <CardTitle as="h3">Area query results</CardTitle>
         <AppButton
@@ -82,24 +66,39 @@ export function ConnectorResultsPanel({
       >
         <section className="connector-results-panel__summary">
           <div className="connector-results-panel__summary-header">
-            <strong>Observation summary</strong>
-            {hasActiveFilters ? (
+            <div className="connector-results-panel__summary-copy">
+              <strong>Observation summary</strong>
+              <span>Visible GBIF results for the current area query.</span>
+            </div>
+            <div className="connector-results-panel__summary-actions">
               <AppButton
-                onClick={() =>
-                  onFiltersChange({
-                    includeFlora: true,
-                    includeFauna: true,
-                    requireImage: false,
-                    basisOfRecord: null,
-                    yearFrom: '',
-                    yearTo: '',
-                  })
-                }
+                className="connector-results-panel__fit-button"
+                onClick={onFitToFilteredResults}
                 variant="secondary"
               >
-                Reset filters
+                Fit results
               </AppButton>
-            ) : null}
+              {hasActiveFilters ? (
+                <AppButton
+                  className="connector-results-panel__reset-button"
+                  onClick={() =>
+                    onFiltersChange({
+                      includeFlora: true,
+                      includeFauna: true,
+                      requireImage: false,
+                      basisOfRecord: null,
+                      country: null,
+                      stateProvince: null,
+                      yearFrom: '',
+                      yearTo: '',
+                    })
+                  }
+                  variant="secondary"
+                >
+                  Reset filters
+                </AppButton>
+              ) : null}
+            </div>
           </div>
 
           <div className="connector-results-panel__metrics">
@@ -113,6 +112,10 @@ export function ConnectorResultsPanel({
           </div>
 
           <div className="connector-results-panel__filters">
+            <div className="connector-results-panel__filters-header">
+              <strong>Filters</strong>
+              <span>Refine the loaded observation records without rerunning the query.</span>
+            </div>
             <div className="connector-results-panel__toggle-group">
               <AppButton
                 className={`connector-results-panel__filter-button${filters.includeFlora ? ' connector-results-panel__filter-button--active' : ''}`}
@@ -152,7 +155,7 @@ export function ConnectorResultsPanel({
               </AppButton>
             </div>
 
-            <div className="connector-results-panel__field-row">
+            <div className="connector-results-panel__field-stack">
               <label className="connector-results-panel__field">
                 <span>Basis of record</span>
                 <select
@@ -174,7 +177,57 @@ export function ConnectorResultsPanel({
                   ))}
                 </select>
               </label>
+            </div>
 
+            <div className="connector-results-panel__field-stack">
+              <label className="connector-results-panel__field">
+                <span>Country</span>
+                <select
+                  className="connector-results-panel__select"
+                  onChange={(event) =>
+                    onFiltersChange({
+                      ...filters,
+                      country:
+                        event.target.value.trim() === '' ? null : event.target.value,
+                    })
+                  }
+                  value={filters.country ?? ''}
+                >
+                  <option value="">All countries</option>
+                  {availableCountries.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="connector-results-panel__field-stack">
+              <label className="connector-results-panel__field">
+                <span>State or province</span>
+                <select
+                  className="connector-results-panel__select"
+                  onChange={(event) =>
+                    onFiltersChange({
+                      ...filters,
+                      stateProvince:
+                        event.target.value.trim() === '' ? null : event.target.value,
+                    })
+                  }
+                  value={filters.stateProvince ?? ''}
+                >
+                  <option value="">All states</option>
+                  {availableStates.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="connector-results-panel__field-row connector-results-panel__field-row--years">
               <label className="connector-results-panel__field">
                 <span>Year from</span>
                 <input
@@ -223,25 +276,28 @@ export function ConnectorResultsPanel({
                 ))}
               </ul>
             </div>
-            <div className="connector-results-panel__metric-block">
+            <div className="connector-results-panel__metric-block connector-results-panel__metric-block--years">
               <strong>Observed years</strong>
-              <p className="connector-results-panel__range">
-                {summary.yearRange.min !== null && summary.yearRange.max !== null
-                  ? `${summary.yearRange.min} to ${summary.yearRange.max}`
-                  : 'Not available'}
-              </p>
+              {summary.yearRange.min !== null && summary.yearRange.max !== null ? (
+                <div className="connector-results-panel__year-range">
+                  <div className="connector-results-panel__year-pill">
+                    <span>From</span>
+                    <strong>{summary.yearRange.min}</strong>
+                  </div>
+                  <div className="connector-results-panel__year-pill">
+                    <span>To</span>
+                    <strong>{summary.yearRange.max}</strong>
+                  </div>
+                </div>
+              ) : (
+                <p className="connector-results-panel__range">Not available</p>
+              )}
             </div>
           </div>
         </section>
 
         {datasets.map((dataset) => {
-          const topSpecies = buildDatasetTopSpecies(dataset)
-          const floraCount = dataset.collection.features.filter(
-            (feature) => feature.properties.rawAttributes?.kingdom === 'Plantae',
-          ).length
-          const faunaCount = dataset.collection.features.filter(
-            (feature) => feature.properties.rawAttributes?.kingdom === 'Animalia',
-          ).length
+          const datasetSummary = summarizeConnectorDataset(dataset)
 
           return (
             <section className="connector-results-panel__dataset" key={dataset.id}>
@@ -251,23 +307,13 @@ export function ConnectorResultsPanel({
               </div>
 
               <div className="connector-results-panel__metrics">
-                <Tag variant="primary">
-                  Species: {
-                    new Set(
-                      dataset.collection.features.map(
-                        (feature) =>
-                          feature.properties.scientificName?.trim() ||
-                          feature.properties.title.trim(),
-                      ),
-                    ).size
-                  }
-                </Tag>
-                <Tag variant="primary">Flora: {floraCount}</Tag>
-                <Tag variant="primary">Fauna: {faunaCount}</Tag>
+                <Tag variant="primary">Species: {datasetSummary.speciesCount}</Tag>
+                <Tag variant="primary">Flora: {datasetSummary.floraCount}</Tag>
+                <Tag variant="primary">Fauna: {datasetSummary.faunaCount}</Tag>
               </div>
 
               <ul className="connector-results-panel__species-list">
-                {topSpecies.map((entry) => (
+                {datasetSummary.topSpecies.map((entry) => (
                   <li className="connector-results-panel__species-item" key={`${dataset.id}-${entry.scientificName}`}>
                     <div>
                       <strong>{entry.scientificName}</strong>

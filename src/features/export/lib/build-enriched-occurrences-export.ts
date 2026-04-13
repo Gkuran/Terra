@@ -9,7 +9,19 @@ interface ExportPointSampleItem {
   samples: SoilGridsPointSample[]
 }
 
+interface ExportEnvironmentalLayerSnapshot {
+  depthId: string
+  id: string
+  isVisible: string
+  label: string
+  opacity: string
+  propertyId: string
+  statisticId: string
+}
+
 interface BuildEnrichedOccurrencesExportInput {
+  activeEnvironmentalLayers: ExportEnvironmentalLayerSnapshot[]
+  activeFilters: Record<string, string | boolean | null>
   gbifDatasets: ConnectorDataset[]
   macrostratDatasets: ConnectorDataset[]
   soilSampleItems: ExportPointSampleItem[]
@@ -28,7 +40,7 @@ function toCsv(rows: Array<Record<string, string>>) {
     return ''
   }
 
-  const headers = Object.keys(rows[0])
+  const headers = [...new Set(rows.flatMap((row) => Object.keys(row)))]
   const headerRow = headers.map(escapeCsvCell).join(',')
   const bodyRows = rows.map((row) =>
     headers.map((header) => escapeCsvCell(row[header] ?? '')).join(','),
@@ -116,10 +128,13 @@ function findMacrostratFeatureForPoint(
 }
 
 export function buildEnrichedOccurrencesExport({
+  activeEnvironmentalLayers,
+  activeFilters,
   gbifDatasets,
   macrostratDatasets,
   soilSampleItems,
 }: BuildEnrichedOccurrencesExportInput) {
+  const exportedAt = new Date().toISOString()
   const gbifFeatures = gbifDatasets.flatMap((dataset) =>
     dataset.collection.features
       .filter(
@@ -142,6 +157,8 @@ export function buildEnrichedOccurrencesExport({
     const pointCoordinates = extractPointCoordinates(feature)
     const rawAttributes = feature.properties.rawAttributes ?? {}
     const occurrenceKey = rawAttributes.occurrenceKey ?? ''
+    const sourceDataset =
+      gbifDatasets.find((dataset) => dataset.id === feature.properties.datasetId) ?? null
     const macrostratFeature = pointCoordinates
       ? findMacrostratFeatureForPoint(
           [pointCoordinates.longitude, pointCoordinates.latitude],
@@ -150,24 +167,55 @@ export function buildEnrichedOccurrencesExport({
       : null
     const soilSamples = soilSampleById.get(feature.properties.id) ?? []
     const soilColumns = Object.fromEntries(
-      soilSamples.map((sample) => [
-        normalizeSoilColumnName(sample),
-        sample.value === null ? '' : `${sample.value} ${sample.unit}`,
-      ]),
+      soilSamples.flatMap((sample) => {
+        const baseColumnName = normalizeSoilColumnName(sample)
+
+        return [
+          [baseColumnName, sample.value === null ? '' : `${sample.value}`],
+          [`${baseColumnName}_unit`, sample.unit],
+          [`${baseColumnName}_label`, sample.propertyLabel],
+        ] as const
+      }),
     )
 
     return {
+      bgsr_export_format: 'bgsr-enriched-occurrences-csv',
+      bgsr_exported_at: exportedAt,
+      bgsr_dataset_id: sourceDataset?.id ?? feature.properties.datasetId,
       occurrence_key: occurrenceKey,
       dataset_label: datasetLabel,
+      dataset_source_type: sourceDataset?.sourceType ?? 'gbif',
+      dataset_context: sourceDataset?.context ?? '',
+      dataset_provider: sourceDataset?.provenance.provider ?? 'GBIF',
+      dataset_imported_at: sourceDataset?.importedAt ?? '',
+      dataset_query_label: sourceDataset?.provenance.queryLabel ?? '',
+      dataset_query_params_json: JSON.stringify(sourceDataset?.provenance.queryParams ?? {}),
+      dataset_notes_json: JSON.stringify(sourceDataset?.provenance.notes ?? []),
+      session_filters_json: JSON.stringify(activeFilters),
+      environmental_layers_json: JSON.stringify(activeEnvironmentalLayers),
+      feature_id: feature.properties.id,
       category: feature.properties.category,
       scientific_name: feature.properties.scientificName ?? feature.properties.title,
+      common_name: rawAttributes.vernacularName ?? '',
       observed_at: feature.properties.observedAt,
       latitude: pointCoordinates ? `${pointCoordinates.latitude}` : '',
       longitude: pointCoordinates ? `${pointCoordinates.longitude}` : '',
       basis_of_record: rawAttributes.basisOfRecord ?? '',
       country: rawAttributes.country ?? feature.properties.biome,
+      state_province: rawAttributes.stateProvince ?? '',
       municipality: feature.properties.municipality,
+      biome: feature.properties.biome,
+      summary: feature.properties.summary,
+      recorded_by: rawAttributes.recordedBy ?? '',
+      institution_code: rawAttributes.institutionCode ?? '',
+      kingdom: rawAttributes.kingdom ?? '',
+      has_media: rawAttributes.hasMedia ?? '',
+      media_count: rawAttributes.mediaCount ?? '',
       macrostrat_unit: macrostratFeature?.properties.title ?? '',
+      macrostrat_dataset_label:
+        macrostratFeature?.properties.datasetId
+          ? macrostratDatasets.find((dataset) => dataset.id === macrostratFeature.properties.datasetId)?.label ?? ''
+          : '',
       macrostrat_lithology:
         macrostratFeature?.properties.rawAttributes?.lithology ??
         macrostratFeature?.properties.municipality ??
@@ -176,8 +224,18 @@ export function buildEnrichedOccurrencesExport({
         macrostratFeature?.properties.rawAttributes?.bestInterval ??
         macrostratFeature?.properties.biome ??
         '',
+      macrostrat_top_interval:
+        macrostratFeature?.properties.rawAttributes?.topInterval ?? '',
+      macrostrat_bottom_interval:
+        macrostratFeature?.properties.rawAttributes?.bottomInterval ?? '',
+      macrostrat_top_age_ma:
+        macrostratFeature?.properties.rawAttributes?.topAgeMa ?? '',
+      macrostrat_bottom_age_ma:
+        macrostratFeature?.properties.rawAttributes?.bottomAgeMa ?? '',
       macrostrat_reference:
         macrostratFeature?.properties.rawAttributes?.sourceReference ?? '',
+      macrostrat_description:
+        macrostratFeature?.properties.rawAttributes?.description ?? '',
       ...soilColumns,
     }
   })

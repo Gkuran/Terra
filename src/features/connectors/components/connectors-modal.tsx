@@ -19,6 +19,10 @@ import type { FeatureCollection, Geometry } from 'geojson'
 import type { FeatureProperties } from '@/entities/geographic-feature/model/geographic-feature'
 import { parseCsvToFeatures } from '@/features/connectors/csv/lib/parse-csv-to-features'
 import { searchGbifOccurrences } from '@/features/connectors/gbif/lib/search-gbif-occurrences'
+import type { ConnectorDataset } from '@/features/connectors/types/connector-dataset'
+import type { BgsrSessionImport } from '@/features/export/lib/bgsr-session-schema'
+import { parseBgsrSessionFile } from '@/features/export/lib/parse-bgsr-session-file'
+import { useConnectorDatasetsStore } from '@/features/connectors/stores/use-connector-datasets-store'
 import { fetchEnvironmentalLayerCatalog } from '@/features/environmental-layers/api/fetch-environmental-layer-catalog'
 import { requestSoilGridsLayer } from '@/features/environmental-layers/api/request-soilgrids-layer'
 import type { EnvironmentalLayer } from '@/features/environmental-layers/types/environmental-layer'
@@ -33,11 +37,14 @@ interface ConnectorsModalProps {
   onClose: () => void
   onImportCsv: (input: {
     collection: FeatureCollection<Geometry, FeatureProperties>
+    provenance?: Partial<ConnectorDataset['provenance']>
     sourceName: string
   }) => void
+  onImportSession: (input: { fileName: string; session: BgsrSessionImport }) => void
   onOpenShapefileImport: () => void
   onConnectGbif: (input: {
     collection: FeatureCollection<Geometry, FeatureProperties>
+    provenance?: Partial<ConnectorDataset['provenance']>
     sourceName: string
   }) => void
   onAddEnvironmentalLayer: (layer: EnvironmentalLayer) => void
@@ -47,10 +54,12 @@ export function ConnectorsModal({
   isOpen,
   onClose,
   onImportCsv,
+  onImportSession,
   onOpenShapefileImport,
   onConnectGbif,
   onAddEnvironmentalLayer,
 }: ConnectorsModalProps) {
+  const recentQueries = useConnectorDatasetsStore((state) => state.recentQueries)
   const [activeTab, setActiveTab] = useState<ConnectorMode>('observations')
   const [csvFeedback, setCsvFeedback] = useState<string | null>(null)
   const [scientificName, setScientificName] = useState('Araucaria angustifolia')
@@ -69,9 +78,27 @@ export function ConnectorsModal({
   const gbifMutation = useMutation({
     mutationFn: searchGbifOccurrences,
     onSuccess: (collection, variables) => {
+      const normalizedScientificName = variables.scientificName.trim()
+      const normalizedCountry = variables.country.trim().toUpperCase()
+      const normalizedStateProvince = variables.stateProvince?.trim() ?? ''
+
       onConnectGbif({
         collection,
-        sourceName: variables.scientificName.trim() || 'GBIF dataset',
+        provenance: {
+          provider: 'GBIF',
+          sourceName: normalizedScientificName || 'GBIF dataset',
+          queryLabel: [normalizedScientificName, normalizedStateProvince, normalizedCountry]
+            .filter((value) => value !== '')
+            .join(' / '),
+          queryParams: {
+            scientificName: normalizedScientificName,
+            country: normalizedCountry,
+            ...(normalizedStateProvince ? { stateProvince: normalizedStateProvince } : {}),
+            limit: '200',
+          },
+          notes: ['Imported from the manual GBIF observations connector.'],
+        },
+        sourceName: normalizedScientificName || 'GBIF dataset',
       })
       onClose()
     },
@@ -94,6 +121,21 @@ export function ConnectorsModal({
   )
   const availableDepths = selectedProperty?.depths ?? []
   const availableStatistics = selectedProperty?.statistics ?? []
+  const recentObservationQueries = useMemo(
+    () =>
+      recentQueries.filter(
+        (entry) => entry.sourceType === 'gbif' && entry.context === 'manual',
+      ),
+    [recentQueries],
+  )
+  const recentImportQueries = useMemo(
+    () =>
+      recentQueries.filter(
+        (entry) =>
+          entry.sourceType === 'csv' || entry.sourceType === 'shapefile',
+      ),
+    [recentQueries],
+  )
 
   useEffect(() => {
     if (!availableProperties.length) {
@@ -160,6 +202,14 @@ export function ConnectorsModal({
       )
       onImportCsv({
         collection,
+        provenance: {
+          provider: 'CSV',
+          sourceName: file.name,
+          queryParams: {
+            fileName: file.name,
+          },
+          notes: ['Imported from a local CSV file.'],
+        },
         sourceName: file.name,
       })
       onClose()
@@ -172,6 +222,47 @@ export function ConnectorsModal({
     }
   }
 
+  async function handleSessionFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const [file] = Array.from(event.target.files ?? [])
+
+    if (!file) {
+      return
+    }
+
+    try {
+      const session = await parseBgsrSessionFile(file)
+      setCsvFeedback(
+        `BGSR session imported from ${file.name} with ${session.sessionData.connectorDatasets.length} connector datasets and ${session.layers.environmental.length} environmental layers.`,
+      )
+      onImportSession({
+        fileName: file.name,
+        session,
+      })
+      onClose()
+    } catch (error) {
+      setCsvFeedback(
+        error instanceof Error
+          ? error.message
+          : 'BGSR session import could not be completed.',
+      )
+    } finally {
+      event.target.value = ''
+    }
+  }
+
+  function formatRecordedAt(value: string) {
+    const parsedDate = new Date(value)
+
+    if (Number.isNaN(parsedDate.getTime())) {
+      return 'Unknown date'
+    }
+
+    return new Intl.DateTimeFormat('en-US', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(parsedDate)
+  }
+
   return (
     <Modal isOpen={isOpen} onClose={handleClose} size="lg" variant="glass">
       <ModalHeader>
@@ -179,6 +270,7 @@ export function ConnectorsModal({
       </ModalHeader>
 
       <ModalContent>
+        <div data-tour="connectors-modal">
         <Tabs.Root
           onValueChange={(value) => {
             setActiveTab(value as ConnectorMode)
@@ -235,6 +327,46 @@ export function ConnectorsModal({
               {gbifMutation.error ? (
                 <Alert variant="danger">{gbifMutation.error.message}</Alert>
               ) : null}
+              <div className="connectors-modal__history">
+                <div className="connectors-modal__history-header">
+                  <strong>Recent observation queries</strong>
+                  <span>{recentObservationQueries.length} stored in this session</span>
+                </div>
+                {recentObservationQueries.length === 0 ? (
+                  <p className="connectors-modal__history-empty">
+                    No manual GBIF queries were recorded yet.
+                  </p>
+                ) : (
+                  <ul className="connectors-modal__history-list">
+                    {recentObservationQueries.slice(0, 4).map((entry) => (
+                      <li className="connectors-modal__history-item" key={entry.id}>
+                        <div className="connectors-modal__history-copy">
+                          <strong>{entry.provenance.queryLabel ?? entry.label}</strong>
+                          <span>
+                            {entry.provenance.recordCount} records •{' '}
+                            {formatRecordedAt(entry.recordedAt)}
+                          </span>
+                        </div>
+                        <AppButton
+                          onClick={() => {
+                            setScientificName(
+                              entry.provenance.queryParams.scientificName ?? '',
+                            )
+                            setCountry(entry.provenance.queryParams.country ?? '')
+                            setStateProvince(
+                              entry.provenance.queryParams.stateProvince ?? '',
+                            )
+                            gbifMutation.reset()
+                          }}
+                          variant="secondary"
+                        >
+                          Use again
+                        </AppButton>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
           </Tabs.Content>
 
@@ -327,13 +459,50 @@ export function ConnectorsModal({
                 <strong>Select a CSV file</strong>
                 <span>Expected columns include `latitude`/`longitude` or `decimalLatitude`/`decimalLongitude`.</span>
               </label>
+              <label className="connectors-modal__dropzone">
+                <input
+                  accept=".bgsr.json,.json,application/json"
+                  className="connectors-modal__file-input"
+                  onChange={handleSessionFileChange}
+                  type="file"
+                />
+                <strong>Select a BGSR session file</strong>
+                <span>Use a `.bgsr.json` export to restore datasets, filters, layers, and core map state.</span>
+              </label>
               {csvFeedback ? <Alert variant="info">{csvFeedback}</Alert> : null}
               <AppButton onClick={onOpenShapefileImport} variant="primary">
                 Open shapefile import
               </AppButton>
+              <div className="connectors-modal__history">
+                <div className="connectors-modal__history-header">
+                  <strong>Recent file imports</strong>
+                  <span>{recentImportQueries.length} stored in this session</span>
+                </div>
+                {recentImportQueries.length === 0 ? (
+                  <p className="connectors-modal__history-empty">
+                    No local imports were recorded yet.
+                  </p>
+                ) : (
+                  <ul className="connectors-modal__history-list">
+                    {recentImportQueries.slice(0, 4).map((entry) => (
+                      <li className="connectors-modal__history-item" key={entry.id}>
+                        <div className="connectors-modal__history-copy">
+                          <strong>{entry.provenance.sourceName}</strong>
+                          <span>
+                            {entry.sourceType.toUpperCase()} •{' '}
+                            {entry.provenance.recordCount} records •{' '}
+                            {formatRecordedAt(entry.recordedAt)}
+                          </span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
           </Tabs.Content>
         </Tabs.Root>
+        </div>
       </ModalContent>
 
       <ModalFooter>

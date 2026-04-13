@@ -20,7 +20,7 @@ export function MapToolbar({
   const setSelection = useMapUiStore((state) => state.setSelection)
 
   return (
-    <Card className="map-toolbar" variant="glass">
+    <Card className="map-toolbar" data-tour="map-toolbar" variant="glass">
       <CardContent className="map-toolbar__content">
         <AppButton
           aria-label="Open layers panel"

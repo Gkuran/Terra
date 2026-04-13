@@ -48,7 +48,11 @@ export function ConnectorLegendPanel({
   onZoomToDataset,
 }: ConnectorLegendPanelProps) {
   return (
-    <Card className="connector-legend-panel" variant="default">
+    <Card
+      className={`connector-legend-panel${datasets.length >= 4 ? ' connector-legend-panel--scrollable' : ''}`}
+      data-tour="connector-legend-panel"
+      variant="default"
+    >
       <CardHeader className="connector-legend-panel__header">
         <CardTitle as="h3">Observation layers</CardTitle>
         <AppButton onClick={onClearAll} variant="secondary">

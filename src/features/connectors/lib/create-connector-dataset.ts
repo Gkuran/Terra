@@ -2,6 +2,8 @@ import type { FeatureProperties } from '@/entities/geographic-feature/model/geog
 import type {
   ConnectorContext,
   ConnectorDataset,
+  ConnectorDatasetProvenance,
+  ConnectorDatasetProvider,
   ConnectorSourceType,
 } from '@/features/connectors/types/connector-dataset'
 
@@ -19,7 +21,16 @@ interface CreateConnectorDatasetInput {
   context: ConnectorContext
   label: string
   order: number
+  provenance?: Partial<ConnectorDatasetProvenance>
   sourceType: ConnectorSourceType
+}
+
+const connectorDatasetProviders: Record<ConnectorSourceType, ConnectorDatasetProvider> = {
+  csv: 'CSV',
+  gbif: 'GBIF',
+  macrostrat: 'Macrostrat',
+  shapefile: 'Shapefile',
+  wosis: 'WoSIS',
 }
 
 function slugifyLabel(value: string) {
@@ -55,26 +66,77 @@ function prefixCollectionFeatures(
   }
 }
 
+interface BuildConnectorDatasetProvenanceInput {
+  context: ConnectorContext
+  importedAt: string
+  label: string
+  recordCount: number
+  sourceType: ConnectorSourceType
+  provenance?: Partial<ConnectorDatasetProvenance>
+}
+
+export function buildConnectorDatasetProvenance({
+  context,
+  importedAt,
+  label,
+  recordCount,
+  sourceType,
+  provenance,
+}: BuildConnectorDatasetProvenanceInput): ConnectorDatasetProvenance {
+  return {
+    provider: provenance?.provider ?? connectorDatasetProviders[sourceType] ?? 'Unknown',
+    sourceName: provenance?.sourceName ?? label,
+    importedAt: provenance?.importedAt ?? importedAt,
+    recordCount: provenance?.recordCount ?? recordCount,
+    queryLabel:
+      provenance?.queryLabel ?? (context === 'bbox' || sourceType === 'gbif' ? label : null),
+    queryParams: provenance?.queryParams ?? {},
+    notes: provenance?.notes ?? [],
+  }
+}
+
+export function ensureConnectorDatasetProvenance(
+  dataset: Omit<ConnectorDataset, 'provenance'> & {
+    provenance?: Partial<ConnectorDatasetProvenance>
+  },
+): ConnectorDataset {
+  return {
+    ...dataset,
+    provenance: buildConnectorDatasetProvenance({
+      context: dataset.context,
+      importedAt: dataset.importedAt,
+      label: dataset.label,
+      recordCount: dataset.collection.features.length,
+      sourceType: dataset.sourceType,
+      provenance: dataset.provenance,
+    }),
+  }
+}
+
 export function createConnectorDataset({
   collection,
   context,
   label,
   order,
+  provenance,
   sourceType,
 }: CreateConnectorDatasetInput): ConnectorDataset {
   const timestamp = Date.now()
   const datasetId = `${sourceType}-${slugifyLabel(label) || 'dataset'}-${timestamp}`
   const paletteEntry = connectorDatasetPalette[order % connectorDatasetPalette.length]
+  const importedAt = new Date(timestamp).toISOString()
+  const prefixedCollection = prefixCollectionFeatures(collection, datasetId)
 
-  return {
+  return ensureConnectorDatasetProvenance({
     id: datasetId,
     color: paletteEntry.color,
     context,
-    importedAt: new Date(timestamp).toISOString(),
+    importedAt,
     isVisible: true,
     label,
     sourceType,
     tone: paletteEntry.tone,
-    collection: prefixCollectionFeatures(collection, datasetId),
-  }
+    provenance,
+    collection: prefixedCollection,
+  })
 }

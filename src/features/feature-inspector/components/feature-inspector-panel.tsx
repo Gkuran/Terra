@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
+import type { DatasetMetadata } from '@/entities/dataset/model/dataset'
 import type { FeatureProperties } from '@/entities/geographic-feature/model/geographic-feature'
 import type { GbifOccurrenceDetail } from '@/features/connectors/gbif/api/request-gbif-occurrence-detail'
+import type { ConnectorDatasetProvenance } from '@/features/connectors/types/connector-dataset'
 import {
   Card,
   CardContent,
@@ -15,7 +17,20 @@ import {
   Skeleton,
 } from 'boulder-ui'
 import type { Feature, Geometry } from 'geojson'
-import { LuExpand, LuRotateCcw, LuZoomIn, LuZoomOut } from 'react-icons/lu'
+import {
+  LuChevronLeft,
+  LuChevronRight,
+  LuExpand,
+  LuRotateCcw,
+  LuZoomIn,
+  LuZoomOut,
+} from 'react-icons/lu'
+import { InspectorActions } from '@/features/feature-inspector/components/inspector-actions'
+import { InspectorProvenanceSection } from '@/features/feature-inspector/components/inspector-provenance-section'
+import {
+  formatAttributeLabel,
+  formatObservedDate,
+} from '@/features/feature-inspector/lib/feature-inspector-formatters'
 import { useMapUiStore } from '@/features/map/stores/use-map-ui-store'
 import { AppButton } from '@/shared/ui/app-button/app-button'
 import { StatusBadge } from '@/shared/ui/status-badge/status-badge'
@@ -23,44 +38,45 @@ import { StatusBadge } from '@/shared/ui/status-badge/status-badge'
 import './feature-inspector-panel.css'
 
 interface FeatureInspectorPanelProps {
+  baseDataset: DatasetMetadata
+  connectorProvenance?: ConnectorDatasetProvenance | null
   feature: Feature<Geometry, FeatureProperties> | null
   gbifDetail?: GbifOccurrenceDetail | null
   gbifDetailError?: string | null
   isGbifDetailLoading?: boolean
+  navigation?: {
+    currentIndex: number
+    total: number
+    onNext: () => void
+    onPrevious: () => void
+  } | null
+  onCenterFeature: () => void
 }
 
 const mediaZoomLevels = [100, 125, 150, 200, 250, 300] as const
 type MediaZoomLevel = (typeof mediaZoomLevels)[number]
-
-function formatObservedDate(isoDate: string) {
-  const parsedDate = new Date(isoDate)
-
-  if (Number.isNaN(parsedDate.getTime())) {
-    return 'Not provided'
-  }
-
-  return new Intl.DateTimeFormat('en-US', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(parsedDate)
-}
-
-function formatAttributeLabel(key: string) {
-  return key
-    .replace(/_/g, ' ')
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    .replace(/\b\w/g, (character) => character.toUpperCase())
-}
+const hiddenRawAttributeKeys = new Set([
+  'issues',
+  'requestPreview',
+])
 
 export function FeatureInspectorPanel({
+  baseDataset,
+  connectorProvenance = null,
   feature,
   gbifDetail = null,
   gbifDetailError = null,
   isGbifDetailLoading = false,
+  navigation = null,
+  onCenterFeature,
 }: FeatureInspectorPanelProps) {
   const setSelection = useMapUiStore((state) => state.setSelection)
   const properties = feature?.properties ?? null
-  const rawAttributes = Object.entries(properties?.rawAttributes ?? {})
+  const rawAttributes = Object.entries(properties?.rawAttributes ?? {}).filter(
+    ([key, value]) =>
+      !hiddenRawAttributeKeys.has(key) &&
+      value.trim() !== '',
+  )
   const isGeologyFeature = properties?.category === 'geology'
   const primaryMedia = gbifDetail?.media[0] ?? null
   const [isMediaLoaded, setIsMediaLoaded] = useState(false)
@@ -120,15 +136,38 @@ export function FeatureInspectorPanel({
   }
 
   return (
-    <Card className="feature-inspector-panel" variant="default">
+    <Card className="feature-inspector-panel" data-tour="feature-inspector-panel" variant="default">
       <CardHeader className="feature-inspector-panel__header">
-        <div>
+        <div className="feature-inspector-panel__header-copy">
           <CardTitle as="h3">
             {properties?.title ?? 'No selected feature'}
           </CardTitle>
           <CardDescription>
             Selected feature properties and inspection context.
           </CardDescription>
+          {navigation && navigation.total > 1 ? (
+            <div className="feature-inspector-panel__navigation">
+              <AppButton
+                aria-label="Inspect previous feature"
+                className="feature-inspector-panel__navigation-button"
+                onClick={navigation.onPrevious}
+                variant="secondary"
+              >
+                <LuChevronLeft aria-hidden="true" />
+              </AppButton>
+              <span className="feature-inspector-panel__navigation-label">
+                {navigation.currentIndex + 1} / {navigation.total}
+              </span>
+              <AppButton
+                aria-label="Inspect next feature"
+                className="feature-inspector-panel__navigation-button"
+                onClick={navigation.onNext}
+                variant="secondary"
+              >
+                <LuChevronRight aria-hidden="true" />
+              </AppButton>
+            </div>
+          ) : null}
         </div>
       </CardHeader>
 
@@ -177,6 +216,19 @@ export function FeatureInspectorPanel({
           ) : null}
           <p className="feature-inspector-panel__summary">{properties.summary}</p>
 
+          {feature ? (
+            <InspectorActions
+              feature={feature}
+              gbifDetail={gbifDetail}
+              onCenterFeature={onCenterFeature}
+            />
+          ) : null}
+
+          <InspectorProvenanceSection
+            baseDataset={baseDataset}
+            connectorProvenance={connectorProvenance}
+          />
+
           <div className="feature-inspector-panel__grid">
             <DataAttribute
               label="Category"
@@ -198,6 +250,13 @@ export function FeatureInspectorPanel({
               orientation="vertical"
               value={gbifDetail?.scientificName ?? properties.scientificName ?? 'Not provided'}
             />
+            {gbifDetail?.vernacularName ? (
+              <DataAttribute
+                label="Common name"
+                orientation="vertical"
+                value={gbifDetail.vernacularName}
+              />
+            ) : null}
             <DataAttribute
               label="Observed at"
               orientation="vertical"

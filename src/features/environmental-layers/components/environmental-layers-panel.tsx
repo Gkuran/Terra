@@ -29,7 +29,11 @@ export function EnvironmentalLayersPanel({
   onSetLayerVisibility,
 }: EnvironmentalLayersPanelProps) {
   return (
-    <Card className="environmental-layers-panel" variant="default">
+    <Card
+      className="environmental-layers-panel"
+      data-tour="environmental-layers-panel"
+      variant="default"
+    >
       <CardHeader className="environmental-layers-panel__header">
         <div>
           <CardTitle as="h3">Environmental layers</CardTitle>

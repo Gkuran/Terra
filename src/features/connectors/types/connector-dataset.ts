@@ -12,6 +12,24 @@ export type ConnectorDatasetTone =
   | 'amber'
   | 'olive'
 
+export type ConnectorDatasetProvider =
+  | 'CSV'
+  | 'GBIF'
+  | 'Macrostrat'
+  | 'Shapefile'
+  | 'WoSIS'
+  | 'Unknown'
+
+export interface ConnectorDatasetProvenance {
+  provider: ConnectorDatasetProvider
+  sourceName: string
+  importedAt: string
+  recordCount: number
+  queryLabel: string | null
+  queryParams: Record<string, string>
+  notes: string[]
+}
+
 export interface ConnectorDataset {
   id: string
   color: string
@@ -21,5 +39,6 @@ export interface ConnectorDataset {
   context: ConnectorContext
   sourceType: ConnectorSourceType
   tone: ConnectorDatasetTone
+  provenance: ConnectorDatasetProvenance
   collection: FeatureCollection<Geometry, FeatureProperties>
 }

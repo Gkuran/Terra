@@ -17,8 +17,23 @@
 
 .terra-header__brandcopy {
   display: inline-flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.1rem;
   min-height: 2.45rem;
+}
+
+.terra-header__title {
+  line-height: 1;
+}
+
+.terra-header__subtitle {
+  color: color-mix(in srgb, currentColor 72%, transparent);
+  font-size: 0.68rem;
+  font-weight: 500;
+  line-height: 1.1;
+  white-space: nowrap;
 }
 
 .terra-header__actions {

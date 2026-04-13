@@ -26,12 +26,14 @@ export function AreaQuerySettingsModal({
       </ModalHeader>
 
       <ModalContent>
-        <AreaQuerySourcesPanel
-          includeGbif={includeGbif}
-          includeMacrostrat={includeMacrostrat}
-          onToggleGbif={onToggleGbif}
-          onToggleMacrostrat={onToggleMacrostrat}
-        />
+        <div data-tour="query-settings-modal">
+          <AreaQuerySourcesPanel
+            includeGbif={includeGbif}
+            includeMacrostrat={includeMacrostrat}
+            onToggleGbif={onToggleGbif}
+            onToggleMacrostrat={onToggleMacrostrat}
+          />
+        </div>
       </ModalContent>
     </Modal>
   )

@@ -51,6 +51,35 @@
   gap: 0.75rem;
 }
 
+.connector-results-panel__summary-copy,
+.connector-results-panel__filters-header {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.connector-results-panel__summary-copy span,
+.connector-results-panel__filters-header span {
+  color: var(--boulder-color-text-secondary);
+  font-size: 0.82rem;
+}
+
+.connector-results-panel__reset-button {
+  flex: 0 0 auto;
+}
+
+.connector-results-panel__summary-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.connector-results-panel__fit-button {
+  min-height: 2rem;
+  padding-inline: 0.8rem;
+  font-size: 0.84rem;
+}
+
 .connector-results-panel__dataset-header,
 .connector-results-panel__species-item {
   display: flex;
@@ -75,6 +104,10 @@
 .connector-results-panel__filters {
   display: grid;
   gap: 0.75rem;
+  padding: 0.85rem;
+  border: 1px solid rgba(18, 31, 26, 0.08);
+  border-radius: 0.85rem;
+  background: rgba(245, 249, 247, 0.74);
 }
 
 .connector-results-panel__toggle-group {
@@ -94,8 +127,18 @@
 
 .connector-results-panel__field-row {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1.25fr) repeat(2, minmax(0, 0.8fr));
   gap: 0.65rem;
+  align-items: end;
+}
+
+.connector-results-panel__field-stack {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.connector-results-panel__field-row--years {
+  grid-template-columns: repeat(2, minmax(0, 0.8fr));
 }
 
 .connector-results-panel__field {
@@ -129,6 +172,12 @@
 .connector-results-panel__metric-block {
   display: grid;
   gap: 0.45rem;
+  min-width: 0;
+  min-height: 100%;
+  padding: 0.8rem 0.85rem;
+  border: 1px solid rgba(18, 31, 26, 0.08);
+  border-radius: 0.85rem;
+  background: rgba(255, 255, 255, 0.64);
 }
 
 .connector-results-panel__simple-list {
@@ -141,15 +190,48 @@
 
 .connector-results-panel__simple-list li {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 0.75rem;
+}
+
+.connector-results-panel__simple-list li span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .connector-results-panel__simple-list li span:last-child,
 .connector-results-panel__range {
   color: var(--boulder-color-text-secondary);
   font-size: 0.82rem;
+  flex: 0 0 auto;
+}
+
+.connector-results-panel__year-range {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: stretch;
+  gap: 0.65rem;
+}
+
+.connector-results-panel__year-pill {
+  display: grid;
+  gap: 0.18rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid rgba(37, 93, 102, 0.14);
+  border-radius: 0.8rem;
+  background: rgba(246, 251, 249, 0.92);
+}
+
+.connector-results-panel__year-pill span {
+  color: var(--boulder-color-text-secondary);
+  font-size: 0.74rem;
+}
+
+.connector-results-panel__year-pill strong {
+  font-size: 1rem;
+  line-height: 1;
+  overflow-wrap: anywhere;
 }
 
 .connector-results-panel__species-list {
@@ -168,6 +250,20 @@
 @media (max-width: 720px) {
   .connector-results-panel__field-row,
   .connector-results-panel__metric-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .connector-results-panel__summary-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .connector-results-panel__summary-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .connector-results-panel__year-range {
     grid-template-columns: 1fr;
   }
 }

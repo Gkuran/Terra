@@ -35,6 +35,7 @@ interface EnvironmentalLayersState {
   layers: EnvironmentalLayer[]
   addLayer: (layer: EnvironmentalLayer) => void
   removeLayer: (layerId: string) => void
+  replaceLayers: (layers: EnvironmentalLayer[]) => void
   setLayerOpacity: (layerId: string, opacity: number) => void
   setLayerVisibility: (layerId: string, isVisible: boolean) => void
 }
@@ -53,6 +54,7 @@ export const useEnvironmentalLayersStore = create<EnvironmentalLayersState>()(
         set((state) => ({
           layers: state.layers.filter((layer) => layer.id !== layerId),
         })),
+      replaceLayers: (layers) => set({ layers }),
       setLayerOpacity: (layerId, opacity) =>
         set((state) => ({
           layers: state.layers.map((layer) =>

@@ -107,7 +107,9 @@ interface MapCanvasProps {
   connectorDatasets: ConnectorDataset[]
   environmentalLayers: EnvironmentalLayer[]
   focusDatasetId: string | null
+  focusFeatureCollection: FeatureCollection<Geometry, FeatureProperties> | null
   onFocusHandled: () => void
+  onFocusFeatureCollectionHandled: () => void
   onBoundingBoxComplete: (bbox: MapBoundingBox) => void
 }
 
@@ -130,18 +132,22 @@ export function MapCanvas({
   connectorDatasets,
   environmentalLayers,
   focusDatasetId,
+  focusFeatureCollection,
   onFocusHandled,
+  onFocusFeatureCollectionHandled,
   onBoundingBoxComplete,
 }: MapCanvasProps) {
   const mapRef = useRef<MapRef | null>(null)
   const visibilityById = useLayerPresentationStore((state) => state.visibilityById)
   const opacityById = useLayerPresentationStore((state) => state.opacityById)
   const activeTool = useMapUiStore((state) => state.activeTool)
+  const focusCoordinates = useMapUiStore((state) => state.focusCoordinates)
   const selection = useMapUiStore((state) => state.selection)
   const setSelection = useMapUiStore((state) => state.setSelection)
   const setEnvironmentalProbeCoordinates = useMapUiStore(
     (state) => state.setEnvironmentalProbeCoordinates,
   )
+  const setFocusCoordinates = useMapUiStore((state) => state.setFocusCoordinates)
   const hoveredFeatureId = useMapUiStore((state) => state.hoveredFeatureId)
   const setHoveredFeatureId = useMapUiStore((state) => state.setHoveredFeatureId)
   const [bboxDraft, setBboxDraft] = useState<BoundingBoxDraft | null>(null)
@@ -341,6 +347,42 @@ export function MapCanvas({
 
     onFocusHandled()
   }, [connectorDatasets, focusDatasetId, onFocusHandled])
+
+  useEffect(() => {
+    if (!focusFeatureCollection || !mapRef.current) {
+      return
+    }
+
+    const bounds = getFeatureCollectionBounds(focusFeatureCollection)
+
+    if (bounds) {
+      mapRef.current.fitBounds(bounds, {
+        padding: {
+          top: 72,
+          right: 96,
+          bottom: 120,
+          left: 96,
+        },
+        duration: 900,
+      })
+    }
+
+    onFocusFeatureCollectionHandled()
+  }, [focusFeatureCollection, onFocusFeatureCollectionHandled])
+
+  useEffect(() => {
+    if (!focusCoordinates || !mapRef.current) {
+      return
+    }
+
+    mapRef.current.easeTo({
+      center: focusCoordinates,
+      duration: 750,
+      zoom: Math.max(mapRef.current.getZoom(), 9),
+    })
+
+    setFocusCoordinates(null)
+  }, [focusCoordinates, setFocusCoordinates])
 
   function handleMapClick(event: MapMouseEvent) {
     if (activeTool !== 'inspect') {

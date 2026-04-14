@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { GeoJSONSource } from 'maplibre-gl'
+import type { FilterSpecification, GeoJSONSource } from 'maplibre-gl'
 import type { Feature, FeatureCollection, GeoJsonProperties, Geometry } from 'geojson'
 import { LuMountain } from 'react-icons/lu'
 import Map, {
@@ -674,7 +674,24 @@ export function MapCanvas({
     const shouldClusterGbifPoints =
       dataset.sourceType === 'gbif' &&
       dataset.collection.features.length >= gbifClusterThreshold
-    const shouldRenderCircleLayer = dataset.sourceType !== 'macrostrat' && dataset.sourceType !== 'gbif'
+    const shouldRenderCircleLayer =
+      dataset.sourceType !== 'macrostrat' &&
+      dataset.sourceType !== 'gbif' &&
+      dataset.sourceType !== 'shapefile'
+    const fillFilter: FilterSpecification | undefined =
+      dataset.sourceType === 'macrostrat' || dataset.sourceType === 'shapefile'
+        ? (['==', ['geometry-type'], 'Polygon'] as unknown as FilterSpecification)
+        : undefined
+    const lineFilter: FilterSpecification | undefined =
+      dataset.sourceType === 'shapefile'
+        ? ([
+            'any',
+            ['==', ['geometry-type'], 'LineString'],
+            ['==', ['geometry-type'], 'Polygon'],
+          ] as unknown as FilterSpecification)
+        : shouldClusterGbifPoints
+          ? (['!', ['has', 'point_count']] as unknown as FilterSpecification)
+          : undefined
 
     return (
       <Source
@@ -688,25 +705,38 @@ export function MapCanvas({
       >
         <Layer
           id={`${dataset.id}-fill`}
-          filter={
-            dataset.sourceType === 'macrostrat'
-              ? ['all', ['!=', ['geometry-type'], 'Point'], ['!=', ['geometry-type'], 'LineString']]
-              : undefined
-          }
+          filter={fillFilter}
           paint={{
             'fill-color': dataset.color,
-            'fill-opacity': dataset.sourceType === 'macrostrat' ? 0.11 : 0.22,
-            'fill-outline-color': dataset.color,
+            'fill-opacity':
+              dataset.sourceType === 'macrostrat'
+                ? 0.11
+                : dataset.sourceType === 'shapefile'
+                  ? 0.3
+                  : 0.22,
+            'fill-outline-color':
+              dataset.sourceType === 'shapefile' ? '#18362a' : dataset.color,
           }}
           type="fill"
         />
         <Layer
           id={`${dataset.id}-line`}
-          filter={shouldClusterGbifPoints ? ['!', ['has', 'point_count']] : undefined}
+          filter={lineFilter}
           paint={{
-            'line-color': dataset.color,
-            'line-opacity': dataset.sourceType === 'macrostrat' ? 0.88 : 0.92,
-            'line-width': dataset.sourceType === 'macrostrat' ? 2.4 : 2.8,
+            'line-color':
+              dataset.sourceType === 'shapefile' ? '#18362a' : dataset.color,
+            'line-opacity':
+              dataset.sourceType === 'macrostrat'
+                ? 0.88
+                : dataset.sourceType === 'shapefile'
+                  ? 0.98
+                  : 0.92,
+            'line-width':
+              dataset.sourceType === 'macrostrat'
+                ? 2.4
+                : dataset.sourceType === 'shapefile'
+                  ? 2.2
+                  : 2.8,
           }}
           type="line"
         />

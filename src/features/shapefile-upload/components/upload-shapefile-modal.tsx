@@ -12,6 +12,7 @@ import {
 import type { FeatureCollection, Geometry } from 'geojson'
 
 import type { FeatureProperties } from '@/entities/geographic-feature/model/geographic-feature'
+import { getFeatureCollectionBounds } from '@/features/map/lib/get-feature-collection-bounds'
 import { createUploadResult } from '@/features/shapefile-upload/lib/create-upload-result'
 import { normalizeUploadedFeatures } from '@/features/shapefile-upload/lib/normalize-uploaded-features'
 import { parseShapefileArchive } from '@/features/shapefile-upload/lib/parse-shapefile'
@@ -27,9 +28,38 @@ interface UploadShapefileModalProps {
   uploadHistory: UploadResult[]
   onClose: () => void
   onUploadComplete: (
-    collection: FeatureCollection<Geometry, FeatureProperties>,
+    collections: Array<{
+      collection: FeatureCollection<Geometry, FeatureProperties>
+      sourceName: string
+    }>,
     result: UploadResult,
   ) => void
+}
+
+function isWebMapBounds(bounds: [[number, number], [number, number]]) {
+  const [[minLongitude, minLatitude], [maxLongitude, maxLatitude]] = bounds
+
+  return (
+    minLongitude >= -180 &&
+    maxLongitude <= 180 &&
+    minLatitude >= -90 &&
+    maxLatitude <= 90
+  )
+}
+
+function buildLayerSourceName(
+  archiveFileName: string,
+  layerFileName: string | null,
+  index: number,
+) {
+  if (!layerFileName) {
+    return `${archiveFileName} - Layer ${index + 1}`
+  }
+
+  const normalizedSegments = layerFileName.replace(/\\/g, '/').split('/')
+  const lastSegment = normalizedSegments.at(-1) ?? layerFileName
+
+  return lastSegment.trim() !== '' ? lastSegment : `${archiveFileName} - Layer ${index + 1}`
 }
 
 export function UploadShapefileModal({
@@ -56,18 +86,46 @@ export function UploadShapefileModal({
     setIsUploading(true)
 
     try {
-      const collection = await parseShapefileArchive(await file.arrayBuffer())
-      const normalizedCollection = normalizeUploadedFeatures(collection, file.name)
+      const parsedLayers = await parseShapefileArchive(await file.arrayBuffer())
+      const normalizedLayers = parsedLayers.map((layer, index) => {
+        const sourceName = buildLayerSourceName(file.name, layer.fileName, index)
+        const normalizedCollection = normalizeUploadedFeatures(layer.collection, sourceName)
+        const bounds = getFeatureCollectionBounds(normalizedCollection)
+
+        if (!bounds) {
+          throw new Error(
+            `The shapefile layer "${sourceName}" does not contain valid geometry bounds for map display.`,
+          )
+        }
+
+        if (!isWebMapBounds(bounds)) {
+          throw new Error(
+            `The shapefile layer "${sourceName}" appears to use projected coordinates or an unsupported CRS. Reproject the dataset to EPSG:4326 (WGS84 longitude/latitude) and include the .prj file before importing.`,
+          )
+        }
+
+        return {
+          collection: normalizedCollection,
+          sourceName,
+        }
+      })
+      const totalFeatureCount = normalizedLayers.reduce(
+        (count, layer) => count + layer.collection.features.length,
+        0,
+      )
       const result = createUploadResult({
-        featureCount: normalizedCollection.features.length,
+        featureCount: totalFeatureCount,
         idPrefix: 'upload',
-        message: 'Archive parsed locally and ready for overlay review.',
+        message:
+          normalizedLayers.length > 1
+            ? `Archive parsed locally into ${normalizedLayers.length} layers and ready for overlay review.`
+            : 'Archive parsed locally and ready for overlay review.',
         sourceName: file.name,
         status: 'success',
       })
 
       setFeedback(result)
-      onUploadComplete(normalizedCollection, result)
+      onUploadComplete(normalizedLayers, result)
     } catch (error) {
       setFeedback(
         createUploadResult({

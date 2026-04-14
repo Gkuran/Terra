@@ -4,6 +4,10 @@ import { z } from 'zod'
 
 import { isFeatureCollection } from '@/shared/lib/geojson/feature-guards'
 
+interface ParsedShapefileCollection extends FeatureCollection<Geometry, GeoJsonProperties> {
+  fileName?: string
+}
+
 const parsedGeoJsonSchema = z.custom<
   FeatureCollection<Geometry, GeoJsonProperties>
 >(
@@ -13,10 +17,40 @@ const parsedGeoJsonSchema = z.custom<
   },
 )
 
+export interface ParsedShapefileLayer {
+  collection: FeatureCollection<Geometry, GeoJsonProperties>
+  fileName: string | null
+}
+
 export async function parseShapefileArchive(
   archiveBuffer: ArrayBuffer,
 ) {
   const parsed = await shp(archiveBuffer)
 
-  return parsedGeoJsonSchema.parse(parsed)
+  if (Array.isArray(parsed)) {
+    const layers = parsed
+      .filter(
+        (value): value is ParsedShapefileCollection =>
+          typeof value === 'object' && value !== null && isFeatureCollection(value),
+      )
+      .map((value) => ({
+        collection: parsedGeoJsonSchema.parse(value),
+        fileName: typeof value.fileName === 'string' ? value.fileName : null,
+      }))
+
+    if (layers.length === 0) {
+      throw new Error(
+        'Uploaded shapefile data could not be converted to a valid GeoJSON feature collection.',
+      )
+    }
+
+    return layers
+  }
+
+  return [
+    {
+      collection: parsedGeoJsonSchema.parse(parsed),
+      fileName: null,
+    },
+  ]
 }

@@ -1057,29 +1057,45 @@ export function MapViewPage({
   }, [selectedFeature])
 
   function handleUploadComplete(
-    collection: FeatureCollection<Geometry, FeatureProperties>,
+    collections: Array<{
+      collection: FeatureCollection<Geometry, FeatureProperties>
+      sourceName: string
+    }>,
     result: UploadResult,
   ) {
-    addConnectorDataset({
-      collection,
-      context: 'manual',
-      label: result.sourceName,
-      provenance: {
-        provider: 'Shapefile',
-        sourceName: result.sourceName,
-        importedAt: result.importedAt,
-        recordCount: result.featureCount,
-        queryParams: {
-          fileName: result.sourceName,
+    setBboxSearchError(null)
+    collections.forEach(({ collection, sourceName }) => {
+      addConnectorDataset({
+        collection,
+        context: 'manual',
+        label: sourceName,
+        provenance: {
+          provider: 'Shapefile',
+          sourceName,
+          importedAt: result.importedAt,
+          recordCount: collection.features.length,
+          queryParams: {
+            fileName: result.sourceName,
+            layerName: sourceName,
+          },
+          notes: [result.message],
         },
-        notes: [result.message],
-      },
-      sourceType: 'shapefile',
+        sourceType: 'shapefile',
+      })
     })
+    setFocusFeatureCollection({
+      type: 'FeatureCollection',
+      features: collections.flatMap(({ collection }) => collection.features),
+    })
+    setSelection(null)
+    setHoveredFeatureId(null)
     setLastUploadResult(result)
     setSessionUploadHistory([result, ...sessionUploadHistory])
     pushToast({
-      description: `${result.featureCount} features were added from ${result.sourceName}.`,
+      description:
+        collections.length > 1
+          ? `${result.featureCount} features across ${collections.length} shapefile layers were added from ${result.sourceName}.`
+          : `${result.featureCount} features were added from ${result.sourceName}.`,
       title: 'Shapefile imported',
       variant: 'success',
     })
@@ -1366,8 +1382,8 @@ export function MapViewPage({
         isOpen={isUploadModalOpen}
         lastUploadResult={lastUploadResult}
         onClose={() => setIsUploadModalOpen(false)}
-        onUploadComplete={(collection, result) => {
-          handleUploadComplete(collection, result)
+        onUploadComplete={(collections, result) => {
+          handleUploadComplete(collections, result)
           setIsUploadModalOpen(false)
         }}
         uploadHistory={sessionUploadHistory}

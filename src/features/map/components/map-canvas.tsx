@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { FilterSpecification, GeoJSONSource } from 'maplibre-gl'
+import type { FilterSpecification, GeoJSONSource, StyleSpecification } from 'maplibre-gl'
 import type { Feature, FeatureCollection, GeoJsonProperties, Geometry } from 'geojson'
 import { LuMountain } from 'react-icons/lu'
 import Map, {
@@ -12,7 +12,6 @@ import Map, {
   type MapStyleDataEvent,
   Popup,
   Source,
-  type StyleSpecification,
 } from 'react-map-gl/maplibre'
 
 import type { FeatureProperties } from '@/entities/geographic-feature/model/geographic-feature'
@@ -34,60 +33,8 @@ import { env } from '@/shared/config/env'
 
 import './map-canvas.css'
 
-const baseMapStyle: StyleSpecification = {
-  version: 8,
-  sources: {
-    'osm-raster': {
-      type: 'raster',
-      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-      tileSize: 256,
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    },
-  },
-  layers: [
-    {
-      id: 'osm-raster',
-      type: 'raster',
-      source: 'osm-raster',
-    },
-  ],
-}
-
-const analysisMapStyle: StyleSpecification = {
-  version: 8,
-  sources: {
-    'carto-light-nolabels': {
-      type: 'raster',
-      tiles: ['https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png'],
-      tileSize: 256,
-      attribution:
-        '&copy; OpenStreetMap contributors &copy; CARTO',
-    },
-    'carto-light-labels': {
-      type: 'raster',
-      tiles: ['https://a.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png'],
-      tileSize: 256,
-      attribution:
-        '&copy; OpenStreetMap contributors &copy; CARTO',
-    },
-  },
-  layers: [
-    {
-      id: 'carto-light-nolabels',
-      type: 'raster',
-      source: 'carto-light-nolabels',
-    },
-    {
-      id: 'carto-light-labels',
-      type: 'raster',
-      source: 'carto-light-labels',
-      paint: {
-        'raster-opacity': 0.92,
-      },
-    },
-  ],
-}
+const baseMapStyle = 'https://tiles.openfreemap.org/styles/liberty'
+const analysisMapStyle = 'https://tiles.openfreemap.org/styles/positron'
 
 const initialViewState = {
   longitude: -51.15,
@@ -240,7 +187,6 @@ export function MapCanvas({
   function handleMapStyleData(_event: MapStyleDataEvent) {
     if (!areConnectorIconsReady) {
       void ensureConnectorIconsLoaded()
-      return
     }
 
     const map = mapRef.current?.getMap()

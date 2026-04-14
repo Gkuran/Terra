@@ -39,7 +39,9 @@ BGSR can query occurrence data for a selected area and display biological record
 
 Bounding box selection can be used to query a region and immediately populate the map with fauna and flora occurrences in their original spatial context.
 
-![BGSR area query with biodiversity records](./docs/assets/example1.png)
+<p align="center">
+  <img src="./docs/assets/example1.png" alt="BGSR area query with biodiversity records" />
+</p>
 
 When source records include richer media, BGSR can surface additional detail such as images and taxonomic context to make inspection more informative and visually useful.
 
@@ -47,7 +49,9 @@ When source records include richer media, BGSR can surface additional detail suc
 
 Individual records can be opened in the inspector, where the scientific name, media, and occurrence metadata are presented as a focused inspection workflow rather than a raw attribute dump.
 
-![BGSR occurrence inspector with scientific name and image](./docs/assets/example2.png)
+<p align="center">
+  <img src="./docs/assets/example2.png" alt="BGSR occurrence inspector with scientific name and image" />
+</p>
 
 ### Soil Context
 

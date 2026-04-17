@@ -1222,6 +1222,16 @@ export function MapViewPage({
     })
   }
 
+  function handleStartCardOpenSources() {
+    dismissStartCard()
+    setIsConnectorsModalOpen(true)
+  }
+
+  function handleStartCardOpenTour() {
+    dismissStartCard()
+    startTour()
+  }
+
   return (
     <main className="map-view-page">
       <TerraHeader
@@ -1457,8 +1467,8 @@ export function MapViewPage({
         <aside className="map-view-page__inspector">
           <WorkspaceStartCard
             onDismiss={dismissStartCard}
-            onOpenSources={() => setIsConnectorsModalOpen(true)}
-            onOpenTour={startTour}
+            onOpenSources={handleStartCardOpenSources}
+            onOpenTour={handleStartCardOpenTour}
           />
         </aside>
       ) : null}

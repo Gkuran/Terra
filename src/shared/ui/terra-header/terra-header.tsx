@@ -32,7 +32,7 @@ export function TerraHeader({
         </div>
       </HeaderBrand>
 
-      <div className="terra-header__actions">
+      <div className="terra-header__actions" data-tour="header-actions">
         <AppButton
           aria-label="Open data sources"
           className="terra-header__action-button"

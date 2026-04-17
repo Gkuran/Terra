@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Card, CardContent, CardHeader, CardTitle } from 'boulder-ui'
 
@@ -19,7 +19,13 @@ interface CardPosition {
   top: number
 }
 
+interface CardSize {
+  height: number
+  width: number
+}
+
 const HIGHLIGHT_RADIUS = 16
+const OVERLAY_MASK_ID = 'onboarding-tour-overlay-mask'
 
 interface OnboardingTourProps {
   currentStepIndex: number
@@ -34,12 +40,13 @@ interface OnboardingTourProps {
 
 function buildCardPosition(
   rect: HighlightRect | null,
+  cardSize: CardSize,
   placement: OnboardingStep['placement'] = 'default',
 ): CardPosition {
   const viewportWidth = window.innerWidth
   const viewportHeight = window.innerHeight
-  const cardWidth = Math.min(360, viewportWidth - 24)
-  const cardHeight = 238
+  const cardWidth = Math.min(cardSize.width, viewportWidth - 24)
+  const cardHeight = cardSize.height
   const gap = 18
 
   if (!rect) {
@@ -76,6 +83,31 @@ function buildCardPosition(
     }
   }
 
+  if (placement === 'side-left') {
+    const sideGap = 20
+    const centeredTop = Math.min(
+      Math.max(88, rect.top + rect.height / 2 - cardHeight / 2),
+      viewportHeight - cardHeight - 16,
+    )
+    const preferredLeft = rect.left - cardWidth - sideGap
+
+    if (preferredLeft >= 12) {
+      return {
+        left: preferredLeft,
+        top: centeredTop,
+      }
+    }
+
+    const fallbackRight = rect.left + rect.width + sideGap
+
+    if (fallbackRight + cardWidth <= viewportWidth - 12) {
+      return {
+        left: fallbackRight,
+        top: centeredTop,
+      }
+    }
+  }
+
   const preferredBelowTop = rect.top + rect.height + gap
   const preferredAboveTop = rect.top - (cardHeight + 12)
   const resolvedTop =
@@ -101,8 +133,11 @@ export function OnboardingTour({
   steps,
 }: OnboardingTourProps) {
   const [highlightRect, setHighlightRect] = useState<HighlightRect | null>(null)
+  const [cardSize, setCardSize] = useState<CardSize>({ height: 238, width: 360 })
+  const cardRef = useRef<HTMLDivElement | null>(null)
   const currentStep = steps[currentStepIndex] ?? null
   const isModalSideStep = currentStep?.placement === 'modal-side'
+  const isMaskPassive = isModalSideStep || currentStep?.allowBackgroundInteraction === true
 
   useEffect(() => {
     if (!isOpen || !currentStep) {
@@ -110,71 +145,130 @@ export function OnboardingTour({
       return
     }
 
-    const targetElement = document.querySelector(currentStep.target)
-
-    if (!(targetElement instanceof HTMLElement)) {
-      setHighlightRect(null)
-      return
-    }
-
-    targetElement.scrollIntoView({
-      block: 'center',
-      inline: 'center',
-      behavior: 'smooth',
-    })
+    let animationFrameId = 0
+    let mutationObserver: MutationObserver | null = null
+    let targetResizeObserver: ResizeObserver | null = null
+    let activeTargetElement: HTMLElement | null = null
 
     const updateRect = () => {
-      const targetBounds = targetElement.getBoundingClientRect()
+      if (!activeTargetElement) {
+        return
+      }
+
+      const targetBounds = activeTargetElement.getBoundingClientRect()
+      const rectTop = Math.max(8, targetBounds.top - 8)
+      let rectBottom = targetBounds.bottom + 8
+
+      if (currentStep.id === 'query-results') {
+        const footerElement = document.querySelector('.terra-footer')
+
+        if (footerElement instanceof HTMLElement) {
+          rectBottom = Math.min(rectBottom, footerElement.getBoundingClientRect().top - 8)
+        }
+      }
 
       setHighlightRect({
-        top: Math.max(8, targetBounds.top - 8),
+        top: rectTop,
         left: Math.max(8, targetBounds.left - 8),
         width: targetBounds.width + 16,
-        height: targetBounds.height + 16,
+        height: Math.max(24, rectBottom - rectTop),
       })
     }
 
-    updateRect()
-    window.addEventListener('resize', updateRect)
-    window.addEventListener('scroll', updateRect, true)
+    const bindTarget = (targetElement: HTMLElement) => {
+      activeTargetElement = targetElement
+      targetElement.scrollIntoView({
+        block: 'center',
+        inline: 'center',
+        behavior: 'smooth',
+      })
+      updateRect()
+      targetResizeObserver = new ResizeObserver(() => {
+        updateRect()
+      })
+      targetResizeObserver.observe(targetElement)
+      window.addEventListener('resize', updateRect)
+      window.addEventListener('scroll', updateRect, true)
+    }
+
+    const resolveTarget = () => {
+      const targetElement = document.querySelector(currentStep.target)
+
+      if (!(targetElement instanceof HTMLElement)) {
+        return false
+      }
+
+      bindTarget(targetElement)
+      return true
+    }
+
+    if (!resolveTarget()) {
+      setHighlightRect(null)
+      mutationObserver = new MutationObserver(() => {
+        if (!activeTargetElement && resolveTarget()) {
+          mutationObserver?.disconnect()
+          mutationObserver = null
+        }
+      })
+      mutationObserver.observe(document.body, {
+        childList: true,
+        subtree: true,
+      })
+
+      const retryResolveTarget = () => {
+        if (!activeTargetElement && !resolveTarget()) {
+          animationFrameId = window.requestAnimationFrame(retryResolveTarget)
+        }
+      }
+
+      animationFrameId = window.requestAnimationFrame(retryResolveTarget)
+    }
 
     return () => {
+      if (animationFrameId) {
+        window.cancelAnimationFrame(animationFrameId)
+      }
+      mutationObserver?.disconnect()
+      targetResizeObserver?.disconnect()
       window.removeEventListener('resize', updateRect)
       window.removeEventListener('scroll', updateRect, true)
     }
   }, [currentStep, isOpen])
 
-  const cardPosition = useMemo(
-    () => buildCardPosition(highlightRect, currentStep?.placement),
-    [currentStep?.placement, highlightRect],
-  )
-  const overlayPath = useMemo(() => {
-    const viewportWidth = window.innerWidth
-    const viewportHeight = window.innerHeight
-
-    if (!highlightRect) {
-      return `M0 0H${viewportWidth}V${viewportHeight}H0Z`
+  useEffect(() => {
+    if (!isOpen || !cardRef.current) {
+      return
     }
 
-    const left = highlightRect.left
-    const top = highlightRect.top
-    const right = highlightRect.left + highlightRect.width
-    const bottom = highlightRect.top + highlightRect.height
+    const cardElement = cardRef.current
+    const updateCardSize = () => {
+      const bounds = cardElement.getBoundingClientRect()
 
-    return [
-      `M0 0H${viewportWidth}V${viewportHeight}H0Z`,
-      `M${left + HIGHLIGHT_RADIUS} ${top}`,
-      `H${right - HIGHLIGHT_RADIUS}`,
-      `Q${right} ${top} ${right} ${top + HIGHLIGHT_RADIUS}`,
-      `V${bottom - HIGHLIGHT_RADIUS}`,
-      `Q${right} ${bottom} ${right - HIGHLIGHT_RADIUS} ${bottom}`,
-      `H${left + HIGHLIGHT_RADIUS}`,
-      `Q${left} ${bottom} ${left} ${bottom - HIGHLIGHT_RADIUS}`,
-      `V${top + HIGHLIGHT_RADIUS}`,
-      `Q${left} ${top} ${left + HIGHLIGHT_RADIUS} ${top}`,
-      'Z',
-    ].join(' ')
-  }, [highlightRect])
+      setCardSize({
+        height: Math.ceil(bounds.height),
+        width: Math.ceil(bounds.width),
+      })
+    }
+
+    updateCardSize()
+
+    const observer = new ResizeObserver(() => {
+      updateCardSize()
+    })
+
+    observer.observe(cardElement)
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [currentStep, disabledNextHint, isNextDisabled, isOpen])
+
+  const cardPosition = useMemo(
+    () => buildCardPosition(highlightRect, cardSize, currentStep?.placement),
+    [cardSize, currentStep?.placement, highlightRect],
+  )
+  const viewportWidth = window.innerWidth
+  const viewportHeight = window.innerHeight
 
   if (!isOpen || !currentStep) {
     return null
@@ -189,12 +283,37 @@ export function OnboardingTour({
     >
       <svg
         aria-hidden="true"
-        className={`onboarding-tour__mask${isModalSideStep ? ' onboarding-tour__mask--passive' : ''}`}
-        onClick={isModalSideStep ? undefined : onClose}
+        className={`onboarding-tour__mask${isMaskPassive ? ' onboarding-tour__mask--passive' : ''}`}
+        height="100%"
+        onClick={isMaskPassive ? undefined : onClose}
         preserveAspectRatio="none"
-        viewBox={`0 0 ${window.innerWidth} ${window.innerHeight}`}
+        viewBox={`0 0 ${viewportWidth} ${viewportHeight}`}
+        width="100%"
       >
-        <path className="onboarding-tour__mask-path" d={overlayPath} fillRule="evenodd" />
+        <defs>
+          <mask id={OVERLAY_MASK_ID}>
+            <rect fill="white" height={viewportHeight} width={viewportWidth} x="0" y="0" />
+            {highlightRect ? (
+              <rect
+                fill="black"
+                height={highlightRect.height}
+                rx={HIGHLIGHT_RADIUS}
+                ry={HIGHLIGHT_RADIUS}
+                width={highlightRect.width}
+                x={highlightRect.left}
+                y={highlightRect.top}
+              />
+            ) : null}
+          </mask>
+        </defs>
+        <rect
+          className="onboarding-tour__mask-path"
+          height={viewportHeight}
+          mask={`url(#${OVERLAY_MASK_ID})`}
+          width={viewportWidth}
+          x="0"
+          y="0"
+        />
       </svg>
       {highlightRect ? (
         <div
@@ -211,6 +330,7 @@ export function OnboardingTour({
       ) : null}
       <Card
         className="onboarding-tour__card"
+        ref={cardRef}
         style={{
           left: `${cardPosition.left}px`,
           top: `${cardPosition.top}px`,

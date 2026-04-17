@@ -14,10 +14,10 @@ export function buildBgsrTourSteps({
   return [
     {
       id: 'header-brand',
-      target: '[data-tour="header-brand"]',
+      target: '[data-tour="header-actions"]',
       title: 'BGSR workspace',
       description:
-        'This is the main scientific workspace. Most session-level actions start from the header.',
+        'These header actions control the main session workflow: loading sources, configuring area queries, exporting outputs, and reopening the guide.',
     },
     {
       id: 'sources-button',
@@ -52,6 +52,7 @@ export function buildBgsrTourSteps({
         'Choose whether bounding box searches should load GBIF observations, Macrostrat geology, or both.',
     },
     {
+      allowBackgroundInteraction: true,
       id: 'bbox-tool-demo',
       target: '[data-tour="map-toolbar-bbox"]',
       title: 'Run an area query',
@@ -82,7 +83,9 @@ export function buildBgsrTourSteps({
     ...(hasQueryResults
       ? [
           {
+            allowBackgroundInteraction: true,
             id: 'query-results',
+            placement: 'side-left',
             target: '[data-tour="query-results-panel"]',
             title: 'Area query results',
             description:

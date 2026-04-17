@@ -331,7 +331,6 @@ export function OnboardingTour({
         aria-hidden="true"
         className={`onboarding-tour__mask${isMaskPassive ? ' onboarding-tour__mask--passive' : ''}`}
         height="100%"
-        onClick={isMaskPassive ? undefined : onClose}
         preserveAspectRatio="none"
         viewBox={`0 0 ${viewportWidth} ${viewportHeight}`}
         width="100%"

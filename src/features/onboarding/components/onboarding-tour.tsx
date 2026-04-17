@@ -165,12 +165,30 @@ export function OnboardingTour({
   const currentStep = steps[currentStepIndex] ?? null
   const isModalSideStep = currentStep?.placement === 'modal-side'
   const isMaskPassive = isModalSideStep || currentStep?.allowBackgroundInteraction === true
+  const visibleCounterSteps = useMemo(
+    () => steps.filter((step) => !step.hideCounter),
+    [steps],
+  )
+  const currentVisibleStepIndex = useMemo(
+    () =>
+      currentStep
+        ? visibleCounterSteps.findIndex((step) => step.id === currentStep.id) + 1
+        : 0,
+    [currentStep, visibleCounterSteps],
+  )
 
   useEffect(() => {
     if (!isOpen || !currentStep) {
       setHighlightRect(null)
       return
     }
+
+    if (!currentStep.target) {
+      setHighlightRect(null)
+      return
+    }
+
+    const targetSelector = currentStep.target
 
     let animationFrameId = 0
     let mutationObserver: MutationObserver | null = null
@@ -220,7 +238,7 @@ export function OnboardingTour({
     }
 
     const resolveTarget = () => {
-      const targetElement = document.querySelector(currentStep.target)
+      const targetElement = document.querySelector(targetSelector)
 
       if (!(targetElement instanceof HTMLElement)) {
         return false
@@ -366,9 +384,11 @@ export function OnboardingTour({
         variant="glass"
       >
         <CardHeader>
-          <div className="onboarding-tour__counter">
-            Step {currentStepIndex + 1} of {steps.length}
-          </div>
+          {!currentStep.hideCounter ? (
+            <div className="onboarding-tour__counter">
+              Step {currentVisibleStepIndex} of {visibleCounterSteps.length}
+            </div>
+          ) : null}
           <CardTitle as="h3">{currentStep.title}</CardTitle>
         </CardHeader>
         <CardContent className="onboarding-tour__content">

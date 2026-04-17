@@ -13,6 +13,14 @@ export function buildBgsrTourSteps({
 }: BuildBgsrTourStepsInput): OnboardingStep[] {
   return [
     {
+      hideCounter: true,
+      id: 'welcome',
+      nextLabel: 'Begin tour',
+      title: 'Welcome to BGSR',
+      description:
+        'This short walkthrough highlights the main workspace actions and the basic flow for loading observations, running area queries, and inspecting results.',
+    },
+    {
       id: 'header-brand',
       target: '[data-tour="header-actions"]',
       title: 'BGSR workspace',

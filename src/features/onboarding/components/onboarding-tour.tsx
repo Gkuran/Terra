@@ -27,6 +27,33 @@ interface CardSize {
 const HIGHLIGHT_RADIUS = 16
 const OVERLAY_MASK_ID = 'onboarding-tour-overlay-mask'
 
+function getHighlightInsets(stepId: string) {
+  if (stepId === 'connectors-add-observations') {
+    return {
+      bottom: 4,
+      left: 8,
+      right: 8,
+      top: 20,
+    }
+  }
+
+  if (stepId === 'settings-modal') {
+    return {
+      bottom: 6,
+      left: 8,
+      right: 8,
+      top: 18,
+    }
+  }
+
+  return {
+    bottom: 8,
+    left: 8,
+    right: 8,
+    top: 8,
+  }
+}
+
 interface OnboardingTourProps {
   currentStepIndex: number
   disabledNextHint?: string | null
@@ -156,8 +183,9 @@ export function OnboardingTour({
       }
 
       const targetBounds = activeTargetElement.getBoundingClientRect()
-      const rectTop = Math.max(8, targetBounds.top - 8)
-      let rectBottom = targetBounds.bottom + 8
+      const insets = getHighlightInsets(currentStep.id)
+      const rectTop = Math.max(8, targetBounds.top - insets.top)
+      let rectBottom = targetBounds.bottom + insets.bottom
 
       if (currentStep.id === 'query-results') {
         const footerElement = document.querySelector('.terra-footer')
@@ -169,8 +197,8 @@ export function OnboardingTour({
 
       setHighlightRect({
         top: rectTop,
-        left: Math.max(8, targetBounds.left - 8),
-        width: targetBounds.width + 16,
+        left: Math.max(8, targetBounds.left - insets.left),
+        width: targetBounds.width + insets.left + insets.right,
         height: Math.max(24, rectBottom - rectTop),
       })
     }

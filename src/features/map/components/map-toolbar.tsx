@@ -36,6 +36,7 @@ export function MapToolbar({
           aria-label="Enable area selection tool"
           aria-pressed={activeTool === 'bbox'}
           className="map-toolbar__button"
+          data-tour="map-toolbar-bbox"
           onClick={() => setActiveTool('bbox')}
           title="Area selection"
           variant={activeTool === 'bbox' ? 'primary' : 'secondary'}

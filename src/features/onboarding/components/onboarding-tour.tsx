@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Card, CardContent, CardHeader, CardTitle } from 'boulder-ui'
 
 import type { OnboardingStep } from '@/features/onboarding/types/onboarding-step'
@@ -18,32 +19,67 @@ interface CardPosition {
   top: number
 }
 
+const HIGHLIGHT_RADIUS = 16
+
 interface OnboardingTourProps {
   currentStepIndex: number
+  disabledNextHint?: string | null
   isOpen: boolean
+  isNextDisabled?: boolean
   onClose: () => void
   onNext: () => void
   onPrevious: () => void
   steps: OnboardingStep[]
 }
 
-function buildCardPosition(rect: HighlightRect | null): CardPosition {
+function buildCardPosition(
+  rect: HighlightRect | null,
+  placement: OnboardingStep['placement'] = 'default',
+): CardPosition {
   const viewportWidth = window.innerWidth
   const viewportHeight = window.innerHeight
-  const cardWidth = Math.min(352, viewportWidth - 24)
+  const cardWidth = Math.min(360, viewportWidth - 24)
+  const cardHeight = 238
   const gap = 18
 
   if (!rect) {
     return {
       left: Math.max(12, (viewportWidth - cardWidth) / 2),
-      top: Math.max(88, (viewportHeight - 220) / 2),
+      top: Math.max(88, (viewportHeight - cardHeight) / 2),
+    }
+  }
+
+  if (placement === 'modal-side') {
+    const sideGap = 28
+    const rectRight = rect.left + rect.width
+    const rightDockLeft = viewportWidth - cardWidth - 20
+    const leftDockLeft = 20
+    const sideTop = Math.min(
+      Math.max(88, rect.top + rect.height / 2 - cardHeight / 2),
+      viewportHeight - cardHeight - 16,
+    )
+    const canDockRight = rightDockLeft >= rectRight + sideGap
+    const canDockLeft = leftDockLeft + cardWidth + sideGap <= rect.left
+
+    if (canDockRight) {
+      return {
+        left: rightDockLeft,
+        top: sideTop,
+      }
+    }
+
+    if (canDockLeft) {
+      return {
+        left: leftDockLeft,
+        top: sideTop,
+      }
     }
   }
 
   const preferredBelowTop = rect.top + rect.height + gap
-  const preferredAboveTop = rect.top - 232
+  const preferredAboveTop = rect.top - (cardHeight + 12)
   const resolvedTop =
-    preferredBelowTop + 220 <= viewportHeight - 16
+    preferredBelowTop + cardHeight <= viewportHeight - 16
       ? preferredBelowTop
       : Math.max(88, preferredAboveTop)
   const centeredLeft = rect.left + rect.width / 2 - cardWidth / 2
@@ -56,7 +92,9 @@ function buildCardPosition(rect: HighlightRect | null): CardPosition {
 
 export function OnboardingTour({
   currentStepIndex,
+  disabledNextHint = null,
   isOpen,
+  isNextDisabled = false,
   onClose,
   onNext,
   onPrevious,
@@ -64,6 +102,7 @@ export function OnboardingTour({
 }: OnboardingTourProps) {
   const [highlightRect, setHighlightRect] = useState<HighlightRect | null>(null)
   const currentStep = steps[currentStepIndex] ?? null
+  const isModalSideStep = currentStep?.placement === 'modal-side'
 
   useEffect(() => {
     if (!isOpen || !currentStep) {
@@ -106,22 +145,57 @@ export function OnboardingTour({
   }, [currentStep, isOpen])
 
   const cardPosition = useMemo(
-    () => buildCardPosition(highlightRect),
-    [highlightRect],
+    () => buildCardPosition(highlightRect, currentStep?.placement),
+    [currentStep?.placement, highlightRect],
   )
+  const overlayPath = useMemo(() => {
+    const viewportWidth = window.innerWidth
+    const viewportHeight = window.innerHeight
+
+    if (!highlightRect) {
+      return `M0 0H${viewportWidth}V${viewportHeight}H0Z`
+    }
+
+    const left = highlightRect.left
+    const top = highlightRect.top
+    const right = highlightRect.left + highlightRect.width
+    const bottom = highlightRect.top + highlightRect.height
+
+    return [
+      `M0 0H${viewportWidth}V${viewportHeight}H0Z`,
+      `M${left + HIGHLIGHT_RADIUS} ${top}`,
+      `H${right - HIGHLIGHT_RADIUS}`,
+      `Q${right} ${top} ${right} ${top + HIGHLIGHT_RADIUS}`,
+      `V${bottom - HIGHLIGHT_RADIUS}`,
+      `Q${right} ${bottom} ${right - HIGHLIGHT_RADIUS} ${bottom}`,
+      `H${left + HIGHLIGHT_RADIUS}`,
+      `Q${left} ${bottom} ${left} ${bottom - HIGHLIGHT_RADIUS}`,
+      `V${top + HIGHLIGHT_RADIUS}`,
+      `Q${left} ${top} ${left + HIGHLIGHT_RADIUS} ${top}`,
+      'Z',
+    ].join(' ')
+  }, [highlightRect])
 
   if (!isOpen || !currentStep) {
     return null
   }
 
-  return (
+  return createPortal(
     <div
       aria-live="polite"
       aria-modal="true"
       className="onboarding-tour"
       role="dialog"
     >
-      <div className="onboarding-tour__backdrop" onClick={onClose} />
+      <svg
+        aria-hidden="true"
+        className={`onboarding-tour__mask${isModalSideStep ? ' onboarding-tour__mask--passive' : ''}`}
+        onClick={isModalSideStep ? undefined : onClose}
+        preserveAspectRatio="none"
+        viewBox={`0 0 ${window.innerWidth} ${window.innerHeight}`}
+      >
+        <path className="onboarding-tour__mask-path" d={overlayPath} fillRule="evenodd" />
+      </svg>
       {highlightRect ? (
         <div
           aria-hidden="true"
@@ -131,6 +205,7 @@ export function OnboardingTour({
             left: `${highlightRect.left}px`,
             width: `${highlightRect.width}px`,
             height: `${highlightRect.height}px`,
+            borderRadius: `${HIGHLIGHT_RADIUS}px`,
           }}
         />
       ) : null}
@@ -150,6 +225,18 @@ export function OnboardingTour({
         </CardHeader>
         <CardContent className="onboarding-tour__content">
           <p className="onboarding-tour__description">{currentStep.description}</p>
+          {currentStep.imageUrl ? (
+            <figure className="onboarding-tour__media">
+              <img
+                alt={currentStep.imageAlt ?? currentStep.title}
+                className="onboarding-tour__media-image"
+                src={currentStep.imageUrl}
+              />
+            </figure>
+          ) : null}
+          {isNextDisabled && disabledNextHint ? (
+            <p className="onboarding-tour__hint">{disabledNextHint}</p>
+          ) : null}
           <div className="onboarding-tour__actions">
             <AppButton onClick={onClose} variant="secondary">
               Close
@@ -162,13 +249,15 @@ export function OnboardingTour({
               >
                 Back
               </AppButton>
-              <AppButton onClick={onNext} variant="primary">
-                {currentStepIndex === steps.length - 1 ? 'Finish' : 'Next'}
+              <AppButton disabled={isNextDisabled} onClick={onNext} variant="primary">
+                {currentStep.nextLabel ??
+                  (currentStepIndex === steps.length - 1 ? 'Finish' : 'Next')}
               </AppButton>
             </div>
           </div>
         </CardContent>
       </Card>
-    </div>
+    </div>,
+    document.body,
   )
 }

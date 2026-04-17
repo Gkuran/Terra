@@ -27,12 +27,13 @@ export function buildBgsrTourSteps({
         'Use Sources to load GBIF observations, CSV files, shapefiles, environmental layers, or a BGSR session export.',
     },
     {
-      id: 'connectors-modal',
+      id: 'connectors-add-observations',
       action: 'open-connectors',
-      target: '[data-tour="connectors-modal"]',
-      title: 'Import and connectors',
+      placement: 'modal-side',
+      target: '[data-tour="connectors-add-observations"]',
+      title: 'Load the example data',
       description:
-        'This modal centralizes live data connectors and local imports. Session restoration also happens here.',
+        'The query form is already prefilled with Araucaria angustifolia in southern Brazil. Click Add observations to fetch the example records and continue the tour.',
     },
     {
       id: 'settings-button',
@@ -44,17 +45,20 @@ export function buildBgsrTourSteps({
     {
       id: 'settings-modal',
       action: 'open-settings',
-      target: '[data-tour="query-settings-modal"]',
+      placement: 'modal-side',
+      target: '[data-tour="query-settings-panel"]',
       title: 'Query sources',
       description:
         'Choose whether bounding box searches should load GBIF observations, Macrostrat geology, or both.',
     },
     {
-      id: 'map-toolbar',
-      target: '[data-tour="map-toolbar"]',
-      title: 'Map tools',
+      id: 'bbox-tool-demo',
+      target: '[data-tour="map-toolbar-bbox"]',
+      title: 'Run an area query',
       description:
-        'Switch between inspect, pan, and bounding-box query modes. The layers button opens the environmental layers panel.',
+        'Use the bbox tool to drag a rectangle on the map and query the visible sources inside that area.',
+      imageAlt: 'Animated example of the bbox tool drawing a rectangle on the map.',
+      imageUrl: '/onboardgif.gif',
     },
     {
       id: 'layers-panel',

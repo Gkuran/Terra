@@ -5,6 +5,9 @@ import './query-feedback-banner.css'
 
 interface QueryFeedbackBannerProps {
   errorMessage: string | null
+  heading?: string
+  helpLabel?: string | null
+  helpUrl?: string | null
   isLoading: boolean
   loadingLabel: string
   onDismissError: () => void
@@ -12,6 +15,9 @@ interface QueryFeedbackBannerProps {
 
 export function QueryFeedbackBanner({
   errorMessage,
+  heading = 'Area query',
+  helpLabel = null,
+  helpUrl = null,
   isLoading,
   loadingLabel,
   onDismissError,
@@ -36,9 +42,19 @@ export function QueryFeedbackBanner({
 
           {errorMessage ? (
             <div className="query-feedback-banner__error">
-              <Alert heading="Area query" variant="danger">
+              <Alert heading={heading} variant="danger">
                 {errorMessage}
               </Alert>
+              {helpUrl && helpLabel ? (
+                <a
+                  className="query-feedback-banner__help-link"
+                  href={helpUrl}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  {helpLabel}
+                </a>
+              ) : null}
               <button
                 aria-label="Dismiss area query error"
                 className="query-feedback-banner__dismiss"

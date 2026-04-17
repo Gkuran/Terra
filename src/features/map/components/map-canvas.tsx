@@ -827,7 +827,7 @@ export function MapCanvas({
   }
 
   return (
-    <section className="map-canvas" aria-label="Terra map canvas">
+    <section className="map-canvas" aria-label="Terra map canvas" data-tour="map-canvas">
       <Map
         cursor={
           activeTool === 'bbox' || activeTool === 'inspect' ? 'crosshair' : 'grab'

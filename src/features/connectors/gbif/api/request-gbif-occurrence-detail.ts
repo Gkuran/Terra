@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { buildGbifErrorFeedback } from '@/features/connectors/gbif/lib/build-gbif-error-feedback'
 import { getRequiredApiBaseUrl } from '@/shared/config/env'
 
 const gbifOccurrenceMediaSchema = z.object({
@@ -72,10 +73,36 @@ export function extractGbifOccurrenceKey(featureId: string, rawAttributes?: Reco
 
 export async function requestGbifOccurrenceDetail(occurrenceKey: number) {
   const apiBaseUrl = getRequiredApiBaseUrl('GBIF occurrence detail requests')
-  const response = await fetch(`${apiBaseUrl}/api/v1/occurrences/${occurrenceKey}`)
+  let response: Response
+
+  try {
+    response = await fetch(`${apiBaseUrl}/api/v1/occurrences/${occurrenceKey}`)
+  } catch (error) {
+    throw new Error(
+      buildGbifErrorFeedback({
+        cause: error,
+        operation: 'occurrence-detail',
+      }).message,
+    )
+  }
 
   if (!response.ok) {
-    throw new Error('GBIF occurrence detail could not be loaded.')
+    const errorPayload = await response.json().catch(() => null)
+    const detail =
+      errorPayload &&
+      typeof errorPayload === 'object' &&
+      'detail' in errorPayload &&
+      typeof errorPayload.detail === 'string'
+        ? errorPayload.detail
+        : null
+
+    throw new Error(
+      buildGbifErrorFeedback({
+        detail,
+        operation: 'occurrence-detail',
+        status: response.status,
+      }).message,
+    )
   }
 
   const json = await response.json()

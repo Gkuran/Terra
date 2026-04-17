@@ -2,6 +2,7 @@ import type { FeatureCollection, Geometry } from 'geojson'
 import { z } from 'zod'
 
 import type { FeatureProperties } from '@/entities/geographic-feature/model/geographic-feature'
+import { buildGbifErrorFeedback } from '@/features/connectors/gbif/lib/build-gbif-error-feedback'
 import { getRequiredApiBaseUrl } from '@/shared/config/env'
 
 const GBIF_API_BASE_URL = 'https://api.gbif.org/v1'
@@ -96,13 +97,24 @@ export async function searchGbifOccurrences({
   }
 
   const apiBaseUrl = getRequiredApiBaseUrl('GBIF searches')
-  const response = await fetch(`${apiBaseUrl}/api/v1/occurrences/search`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(normalizedInput),
-  })
+  let response: Response
+
+  try {
+    response = await fetch(`${apiBaseUrl}/api/v1/occurrences/search`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(normalizedInput),
+    })
+  } catch (error) {
+    throw new Error(
+      buildGbifErrorFeedback({
+        cause: error,
+        operation: 'observation-search',
+      }).message,
+    )
+  }
 
   if (response.ok) {
     const json = await response.json()
@@ -117,14 +129,20 @@ export async function searchGbifOccurrences({
 
   const errorPayload = await response.json().catch(() => null)
   const detail =
-    errorPayload &&
-    typeof errorPayload === 'object' &&
-    'detail' in errorPayload &&
-    typeof errorPayload.detail === 'string'
-      ? errorPayload.detail
-      : 'GBIF request failed. Try adjusting the species or region filters.'
+      errorPayload &&
+      typeof errorPayload === 'object' &&
+      'detail' in errorPayload &&
+      typeof errorPayload.detail === 'string'
+        ? errorPayload.detail
+        : 'GBIF request failed. Try adjusting the species or region filters.'
 
-  throw new Error(detail)
+  throw new Error(
+    buildGbifErrorFeedback({
+      detail,
+      operation: 'observation-search',
+      status: response.status,
+    }).message,
+  )
 }
 
 async function searchGbifOccurrencesDirectly({
@@ -155,10 +173,26 @@ async function searchGbifOccurrencesDirectly({
       params.set('stateProvince', stateProvince.trim())
     }
 
-    const response = await fetch(`${GBIF_API_BASE_URL}/occurrence/search?${params.toString()}`)
+    let response: Response
+
+    try {
+      response = await fetch(`${GBIF_API_BASE_URL}/occurrence/search?${params.toString()}`)
+    } catch (error) {
+      throw new Error(
+        buildGbifErrorFeedback({
+          cause: error,
+          operation: 'observation-search',
+        }).message,
+      )
+    }
 
     if (!response.ok) {
-      throw new Error('GBIF request failed. Try adjusting the species or region filters.')
+      throw new Error(
+        buildGbifErrorFeedback({
+          operation: 'observation-search',
+          status: response.status,
+        }).message,
+      )
     }
 
     const json = await response.json()

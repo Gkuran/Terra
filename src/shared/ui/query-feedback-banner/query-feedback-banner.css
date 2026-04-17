@@ -41,6 +41,19 @@
   background: rgba(15, 23, 42, 0.16);
 }
 
+.query-feedback-banner__help-link {
+  display: inline-flex;
+  margin-top: 0.45rem;
+  color: var(--boulder-color-info-700, var(--boulder-color-text-primary));
+  font-size: 0.84rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.query-feedback-banner__help-link:hover {
+  text-decoration: underline;
+}
+
 @media (max-width: 760px) {
   .query-feedback-banner {
     width: calc(100vw - 1.5rem);

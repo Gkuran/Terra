@@ -18,6 +18,10 @@ import type { FeatureCollection, Geometry } from 'geojson'
 
 import type { FeatureProperties } from '@/entities/geographic-feature/model/geographic-feature'
 import { parseCsvToFeatures } from '@/features/connectors/csv/lib/parse-csv-to-features'
+import {
+  GBIF_SYSTEM_HEALTH_URL,
+  getGbifHelpLinkForMessage,
+} from '@/features/connectors/gbif/lib/build-gbif-error-feedback'
 import { searchGbifOccurrences } from '@/features/connectors/gbif/lib/search-gbif-occurrences'
 import type { ConnectorDataset } from '@/features/connectors/types/connector-dataset'
 import type { BgsrSessionImport } from '@/features/export/lib/bgsr-session-schema'
@@ -25,6 +29,8 @@ import { readBgsrSessionFile } from '@/features/export/lib/read-bgsr-session-fil
 import { useConnectorDatasetsStore } from '@/features/connectors/stores/use-connector-datasets-store'
 import { fetchEnvironmentalLayerCatalog } from '@/features/environmental-layers/api/fetch-environmental-layer-catalog'
 import { requestSoilGridsLayer } from '@/features/environmental-layers/api/request-soilgrids-layer'
+import { OnboardingInlineStep } from '@/features/onboarding/components/onboarding-inline-step'
+import type { OnboardingStep } from '@/features/onboarding/types/onboarding-step'
 import type { EnvironmentalLayer } from '@/features/environmental-layers/types/environmental-layer'
 import { AppButton } from '@/shared/ui/app-button/app-button'
 import { useToastStore } from '@/shared/ui/app-toast'
@@ -34,6 +40,14 @@ import './connectors-modal.css'
 type ConnectorMode = 'observations' | 'environmental' | 'import'
 
 interface ConnectorsModalProps {
+  onboardingStep?: OnboardingStep | null
+  onboardingStepDisabledHint?: string | null
+  onboardingStepIndex?: number
+  onboardingStepsCount?: number
+  onOnboardingClose?: () => void
+  onOnboardingNext?: () => void
+  onOnboardingPrevious?: () => void
+  isOnboardingNextDisabled?: boolean
   hasActiveSession: boolean
   isOpen: boolean
   onClose: () => void
@@ -58,6 +72,14 @@ interface ConnectorsModalProps {
 }
 
 export function ConnectorsModal({
+  onboardingStep = null,
+  onboardingStepDisabledHint = null,
+  onboardingStepIndex = 0,
+  onboardingStepsCount = 1,
+  onOnboardingClose,
+  onOnboardingNext,
+  onOnboardingPrevious,
+  isOnboardingNextDisabled = false,
   hasActiveSession,
   isOpen,
   onClose,
@@ -148,6 +170,9 @@ export function ConnectorsModal({
       ),
     [recentQueries],
   )
+  const gbifErrorHelpLink = gbifMutation.error
+    ? getGbifHelpLinkForMessage(gbifMutation.error.message)
+    : null
 
   useEffect(() => {
     if (!availableProperties.length) {
@@ -300,6 +325,18 @@ export function ConnectorsModal({
 
       <ModalContent>
         <div data-tour="connectors-modal">
+        {onboardingStep ? (
+          <OnboardingInlineStep
+            currentStep={onboardingStep}
+            currentStepIndex={onboardingStepIndex}
+            disabledNextHint={onboardingStepDisabledHint}
+            isNextDisabled={isOnboardingNextDisabled}
+            onClose={onOnboardingClose ?? handleClose}
+            onNext={onOnboardingNext ?? handleClose}
+            onPrevious={onOnboardingPrevious ?? handleClose}
+            stepsCount={onboardingStepsCount}
+          />
+        ) : null}
         <Tabs.Root
           onValueChange={(value) => {
             setActiveTab(value as ConnectorMode)
@@ -320,7 +357,19 @@ export function ConnectorsModal({
               <p className="connectors-modal__copy">
                 Add fauna and flora observations as discrete records. Use GBIF to bring live occurrences for a target taxon and region without leaving Terra.
               </p>
-              <div className="connectors-modal__form">
+              <Alert variant="info">
+                GBIF queries depend on external service availability. Empty or failed responses may come from the source itself.{' '}
+                <a
+                  className="connectors-modal__inline-link"
+                  href={GBIF_SYSTEM_HEALTH_URL}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  Check GBIF system health
+                </a>
+                .
+              </Alert>
+              <div className="connectors-modal__form" data-tour="connectors-observations-form">
                 <FormField label="Scientific name">
                   <Input
                     onChange={(event) =>
@@ -354,7 +403,23 @@ export function ConnectorsModal({
                 <ProgressBar label="Querying GBIF" max={100} showValue value={72} />
               ) : null}
               {gbifMutation.error ? (
-                <Alert variant="danger">{gbifMutation.error.message}</Alert>
+                <Alert variant="danger">
+                  {gbifMutation.error.message}
+                  {gbifErrorHelpLink ? (
+                    <>
+                      {' '}
+                      <a
+                        className="connectors-modal__inline-link"
+                        href={gbifErrorHelpLink.href}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        {gbifErrorHelpLink.label}
+                      </a>
+                      .
+                    </>
+                  ) : null}
+                </Alert>
               ) : null}
               <div className="connectors-modal__history">
                 <div className="connectors-modal__history-header">
@@ -582,6 +647,7 @@ export function ConnectorsModal({
       <ModalFooter>
         {activeTab === 'observations' ? (
           <AppButton
+            data-tour="connectors-add-observations"
             isLoading={gbifMutation.isPending}
             onClick={() =>
               gbifMutation.mutate({

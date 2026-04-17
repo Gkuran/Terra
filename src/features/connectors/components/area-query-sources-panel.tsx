@@ -14,7 +14,7 @@ export function AreaQuerySourcesPanel({
   onToggleMacrostrat,
 }: AreaQuerySourcesPanelProps) {
   return (
-    <div className="area-query-sources-panel">
+    <div className="area-query-sources-panel" data-tour="query-settings-panel">
       <button
         aria-pressed={includeGbif}
         className="area-query-sources-panel__toggle"

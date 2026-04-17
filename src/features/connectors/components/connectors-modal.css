@@ -9,6 +9,16 @@
   color: var(--boulder-color-text-secondary);
 }
 
+.connectors-modal__inline-link {
+  color: var(--boulder-color-info-700, var(--boulder-color-text-primary));
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.connectors-modal__inline-link:hover {
+  text-decoration: underline;
+}
+
 .connectors-modal__dropzone {
   display: grid;
   gap: 0.35rem;

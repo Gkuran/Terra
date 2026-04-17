@@ -30,6 +30,7 @@ import {
   requestGbifOccurrenceDetail,
 } from '@/features/connectors/gbif/api/request-gbif-occurrence-detail'
 import { buildSharedGbifOccurrenceDataset } from '@/features/connectors/gbif/lib/build-shared-gbif-occurrence-dataset'
+import { getGbifHelpLinkForMessage } from '@/features/connectors/gbif/lib/build-gbif-error-feedback'
 import { useConnectorDatasetsStore } from '@/features/connectors/stores/use-connector-datasets-store'
 import { requestSoilGridsBatchPointSample } from '@/features/environmental-layers/api/request-soilgrids-batch-point-sample'
 import { requestResilientSoilGridsSamples } from '@/features/environmental-layers/api/request-resilient-soilgrids-samples'
@@ -92,6 +93,13 @@ function mergeUniqueById<T extends { id: string }>(currentItems: T[], incomingIt
   incomingItems.forEach((item) => mergedItems.set(item.id, item))
 
   return [...mergedItems.values()]
+}
+
+interface QueryErrorState {
+  heading: string
+  helpLabel: string | null
+  helpUrl: string | null
+  message: string
 }
 
 export function MapViewPage({
@@ -208,7 +216,7 @@ export function MapViewPage({
     (state) => state.setSessionUploadHistory,
   )
   const [lastUploadResult, setLastUploadResult] = useState<UploadResult | null>(null)
-  const [bboxSearchError, setBboxSearchError] = useState<string | null>(null)
+  const [bboxSearchError, setBboxSearchError] = useState<QueryErrorState | null>(null)
   const [hasRestoredLocalSnapshot, setHasRestoredLocalSnapshot] = useState(false)
   const [focusDatasetId, setFocusDatasetId] = useState<string | null>(null)
   const [focusFeatureCollection, setFocusFeatureCollection] = useState<
@@ -221,11 +229,27 @@ export function MapViewPage({
   const [isAreaQuerySettingsOpen, setIsAreaQuerySettingsOpen] = useState(false)
   const [climbingViewport, setClimbingViewport] = useState<MapSearchViewport | null>(null)
   const [hoveredClimbingLabel, setHoveredClimbingLabel] = useState<string | null>(null)
+  const [hasCompletedTourObservationQuery, setHasCompletedTourObservationQuery] =
+    useState(false)
+  const [hasCompletedTourBboxQuery, setHasCompletedTourBboxQuery] = useState(false)
   const rightSidebarRef = useRef<HTMLElement | null>(null)
   const lastClimbingErrorRef = useRef<string | null>(null)
   const lastSharedOccurrenceErrorRef = useRef<string | null>(null)
   const lastAppliedSharedOccurrenceKeyRef = useRef<number | null>(null)
   const isSharedOccurrenceMode = sharedOccurrenceKey !== null
+  function createQueryErrorState(
+    message: string,
+    heading = 'Area query',
+  ): QueryErrorState {
+    const helpLink = getGbifHelpLinkForMessage(message)
+
+    return {
+      heading,
+      helpLabel: helpLink?.label ?? null,
+      helpUrl: helpLink?.href ?? null,
+      message,
+    }
+  }
   const visibleEnvironmentalLayers = useMemo(
     () => environmentalLayers.filter((layer) => layer.isVisible),
     [environmentalLayers],
@@ -306,6 +330,10 @@ export function MapViewPage({
       setActiveTool('inspect')
     },
     onSuccess: ({ gbif, macrostrat, warnings }, variables) => {
+      if (isTourOpen) {
+        setHasCompletedTourBboxQuery(true)
+      }
+
       if (gbif) {
         addConnectorDataset({
           collection: gbif.featureCollection,
@@ -370,9 +398,11 @@ export function MapViewPage({
       })
     },
     onError: (error) => {
-      setBboxSearchError(error.message)
+      const queryError = createQueryErrorState(error.message)
+
+      setBboxSearchError(queryError)
       pushToast({
-        description: error.message,
+        description: queryError.message,
         title: 'Area query failed',
         variant: 'danger',
       })
@@ -506,6 +536,42 @@ export function MapViewPage({
     ],
   )
   const currentTourStep = tourSteps[currentTourStepIndex] ?? null
+  const isCurrentTourStepNextDisabled =
+    currentTourStep?.id === 'connectors-add-observations'
+      ? !hasCompletedTourObservationQuery
+      : currentTourStep?.id === 'bbox-tool-demo'
+        ? !hasCompletedTourBboxQuery
+        : false
+  const currentTourStepDisabledHint =
+    currentTourStep?.id === 'connectors-add-observations'
+      ? 'Click Add observations to load the Araucaria example and continue.'
+      : currentTourStep?.id === 'bbox-tool-demo'
+        ? 'Activate the bbox tool and draw one area query on the map to continue.'
+        : null
+
+  function handleTourClose() {
+    closeTour()
+  }
+
+  function handleTourNext() {
+    if (currentTourStepIndex >= tourSteps.length - 1) {
+      completeTour()
+      setIsConnectorsModalOpen(false)
+      setIsAreaQuerySettingsOpen(false)
+      return
+    }
+
+    goToNextTourStep(tourSteps.length)
+  }
+
+  useEffect(() => {
+    if (!isTourOpen || currentTourStepIndex !== 0) {
+      return
+    }
+
+    setHasCompletedTourObservationQuery(false)
+    setHasCompletedTourBboxQuery(false)
+  }, [currentTourStepIndex, isTourOpen])
 
   useEffect(() => {
     const errorMessage =
@@ -528,22 +594,53 @@ export function MapViewPage({
       return
     }
 
-    if (currentTourStep.action === 'open-connectors') {
-      setIsAreaQuerySettingsOpen(false)
-      setIsConnectorsModalOpen(true)
-    }
+    const action = currentTourStep.action
 
-    if (currentTourStep.action === 'open-settings') {
-      setIsConnectorsModalOpen(false)
-      setIsAreaQuerySettingsOpen(true)
-    }
+    setIsConnectorsModalOpen(action === 'open-connectors')
+    setIsAreaQuerySettingsOpen(action === 'open-settings')
 
     if (currentTourStep.action === 'open-layers') {
       setActivePanel('layers')
-      setIsConnectorsModalOpen(false)
-      setIsAreaQuerySettingsOpen(false)
+      return
     }
-  }, [currentTourStep, isTourOpen])
+
+    if (activePanel === 'layers') {
+      setActivePanel(null)
+    }
+  }, [activePanel, currentTourStep, isTourOpen, setActivePanel])
+
+  useEffect(() => {
+    if (
+      isTourOpen &&
+      currentTourStep?.id === 'connectors-add-observations' &&
+      hasCompletedTourObservationQuery
+    ) {
+      goToNextTourStep(tourSteps.length)
+    }
+  }, [
+    currentTourStep?.id,
+    goToNextTourStep,
+    hasCompletedTourObservationQuery,
+    isTourOpen,
+    tourSteps.length,
+  ])
+
+  useEffect(() => {
+    if (
+      isTourOpen &&
+      currentTourStep?.id === 'bbox-tool-demo' &&
+      hasCompletedTourBboxQuery
+    ) {
+      goToNextTourStep(tourSteps.length)
+    }
+  }, [
+    currentTourStep?.id,
+    goToNextTourStep,
+    hasCompletedTourBboxQuery,
+    isTourOpen,
+    tourSteps.length,
+  ])
+
   const gbifOccurrenceSummary = useMemo(
     () => buildGbifOccurrenceSummary(connectorDatasets, gbifOccurrenceFilters),
     [connectorDatasets, gbifOccurrenceFilters],
@@ -701,7 +798,7 @@ export function MapViewPage({
     },
     onError: (error) => {
       setCsvExportStepLabel('Preparing CSV export.')
-      setBboxSearchError(error.message)
+      setBboxSearchError(createQueryErrorState(error.message, 'CSV export'))
       pushToast({
         description: error.message,
         title: 'CSV export failed',
@@ -868,9 +965,11 @@ export function MapViewPage({
     }
 
     lastSharedOccurrenceErrorRef.current = errorMessage
-    setBboxSearchError(errorMessage)
+    const queryError = createQueryErrorState(errorMessage, 'Shared occurrence')
+
+    setBboxSearchError(queryError)
     pushToast({
-      description: errorMessage,
+      description: queryError.message,
       title: 'Shared occurrence failed',
       variant: 'danger',
     })
@@ -888,7 +987,12 @@ export function MapViewPage({
     const sharedDataset = buildSharedGbifOccurrenceDataset(sharedOccurrenceDetailQuery.data)
 
     if (!sharedDataset) {
-      setBboxSearchError('Shared occurrence coordinates are unavailable.')
+      setBboxSearchError({
+        heading: 'Shared occurrence',
+        helpLabel: null,
+        helpUrl: null,
+        message: 'Shared occurrence coordinates are unavailable.',
+      })
       pushToast({
         description: 'The shared occurrence does not contain valid coordinates.',
         title: 'Shared occurrence failed',
@@ -1155,7 +1259,10 @@ export function MapViewPage({
       </div>
 
       <QueryFeedbackBanner
-        errorMessage={bboxSearchError}
+        errorMessage={bboxSearchError?.message ?? null}
+        heading={bboxSearchError?.heading ?? 'Area query'}
+        helpLabel={bboxSearchError?.helpLabel ?? null}
+        helpUrl={bboxSearchError?.helpUrl ?? null}
         isLoading={bboxSearchMutation.isPending}
         loadingLabel={areaQueryLoadingLabel}
         onDismissError={() => setBboxSearchError(null)}
@@ -1399,6 +1506,9 @@ export function MapViewPage({
         onClose={() => setIsConnectorsModalOpen(false)}
         onConnectGbif={({ collection, provenance, sourceName }) => {
           setBboxSearchError(null)
+          if (isTourOpen) {
+            setHasCompletedTourObservationQuery(true)
+          }
           addConnectorDataset({
             collection,
             context: 'manual',
@@ -1497,18 +1607,11 @@ export function MapViewPage({
 
       <OnboardingTour
         currentStepIndex={currentTourStepIndex}
+        disabledNextHint={currentTourStepDisabledHint}
         isOpen={isTourOpen}
-        onClose={closeTour}
-        onNext={() => {
-          if (currentTourStepIndex >= tourSteps.length - 1) {
-            completeTour()
-            setIsConnectorsModalOpen(false)
-            setIsAreaQuerySettingsOpen(false)
-            return
-          }
-
-          goToNextTourStep(tourSteps.length)
-        }}
+        isNextDisabled={isCurrentTourStepNextDisabled}
+        onClose={handleTourClose}
+        onNext={handleTourNext}
         onPrevious={goToPreviousTourStep}
         steps={tourSteps}
       />

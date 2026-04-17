@@ -2,6 +2,7 @@ import type { FeatureCollection, Geometry } from 'geojson'
 import { z } from 'zod'
 
 import type { FeatureProperties } from '@/entities/geographic-feature/model/geographic-feature'
+import { buildGbifErrorFeedback } from '@/features/connectors/gbif/lib/build-gbif-error-feedback'
 import type { MapBoundingBox } from '@/features/map/types/map-bounding-box'
 import { env } from '@/shared/config/env'
 
@@ -54,21 +55,32 @@ export async function searchOccurrencesByBbox(
     throw new Error('VITE_API_BASE_URL is not configured for bbox searches.')
   }
 
-  const response = await fetch(`${env.VITE_API_BASE_URL}/api/v1/occurrences/search-by-bbox`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      bbox: {
-        min_lng: bbox.minLng,
-        min_lat: bbox.minLat,
-        max_lng: bbox.maxLng,
-        max_lat: bbox.maxLat,
+  let response: Response
+
+  try {
+    response = await fetch(`${env.VITE_API_BASE_URL}/api/v1/occurrences/search-by-bbox`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
       },
-      limit: 200,
-    }),
-  })
+      body: JSON.stringify({
+        bbox: {
+          min_lng: bbox.minLng,
+          min_lat: bbox.minLat,
+          max_lng: bbox.maxLng,
+          max_lat: bbox.maxLat,
+        },
+        limit: 200,
+      }),
+    })
+  } catch (error) {
+    throw new Error(
+      buildGbifErrorFeedback({
+        cause: error,
+        operation: 'area-query',
+      }).message,
+    )
+  }
 
   if (!response.ok) {
     const errorPayload = await response.json().catch(() => null)
@@ -80,7 +92,13 @@ export async function searchOccurrencesByBbox(
         ? errorPayload.detail
         : 'Bounding box search failed.'
 
-    throw new Error(detail)
+    throw new Error(
+      buildGbifErrorFeedback({
+        detail,
+        operation: 'area-query',
+        status: response.status,
+      }).message,
+    )
   }
 
   const json = await response.json()
